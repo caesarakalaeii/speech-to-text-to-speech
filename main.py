@@ -10,23 +10,27 @@ import queue
 import json
 import asyncio
 import logging
+import random
 from threading import Thread
 from dotenv import load_dotenv
 import numpy as np
 import pyaudio
 import whisper
 import websockets
+import tkinter as tk
+from tkinter import ttk, messagebox
 
 # Load environment variables
 load_dotenv()
 
 # Configuration
-WEBSOCKET_URL = os.getenv("SPEAKERBOT_WEBSOCKET_URL", "ws://localhost:8080")
+WEBSOCKET_URL = os.getenv("SPEAKERBOT_WEBSOCKET_URL", "ws://localhost:7585/speak")
 WHISPER_MODEL = os.getenv("WHISPER_MODEL", "base")
 SAMPLE_RATE = int(os.getenv("SAMPLE_RATE", "16000"))
 CHUNK_DURATION = float(os.getenv("CHUNK_DURATION", "3.0"))
 SILENCE_THRESHOLD = float(os.getenv("SILENCE_THRESHOLD", "0.01"))
 MIN_SPEECH_DURATION = float(os.getenv("MIN_SPEECH_DURATION", "0.5"))
+VOICE_NAME = os.getenv("VOICE_NAME", "Sally")
 
 # Setup logging
 logging.basicConfig(
@@ -36,16 +40,59 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+def list_microphones():
+    p = pyaudio.PyAudio()
+    devices = []
+    for i in range(p.get_device_count()):
+        info = p.get_device_info_by_index(i)
+        if info.get('maxInputChannels', 0) > 0:
+            devices.append((i, info['name']))
+    p.terminate()
+    return devices
+
+
+class MicrophoneSelector:
+    def __init__(self):
+        self.selected_index = None
+        self.root = tk.Tk()
+        self.root.title('Select Microphone')
+        self.devices = list_microphones()
+        if not self.devices:
+            messagebox.showerror('Error', 'No microphone devices found!')
+            self.root.destroy()
+            return
+        tk.Label(self.root, text='Choose a microphone:').pack(padx=10, pady=10)
+        self.combo = ttk.Combobox(self.root, values=[name for idx, name in self.devices], state='readonly')
+        self.combo.pack(padx=10, pady=10)
+        self.combo.current(0)
+        tk.Button(self.root, text='Select', command=self.select).pack(pady=10)
+        self.root.protocol('WM_DELETE_WINDOW', self.on_close)
+
+    def select(self):
+        idx = self.combo.current()
+        self.selected_index = self.devices[idx][0]
+        self.root.quit()
+
+    def on_close(self):
+        self.selected_index = None
+        self.root.quit()
+
+    def show(self):
+        self.root.mainloop()
+        return self.selected_index
+
+
 class AudioRecorder:
     """Records audio from microphone in chunks"""
     
-    def __init__(self, sample_rate=SAMPLE_RATE, chunk_duration=CHUNK_DURATION):
+    def __init__(self, sample_rate=SAMPLE_RATE, chunk_duration=CHUNK_DURATION, device_index=None):
         self.sample_rate = sample_rate
         self.chunk_duration = chunk_duration
         self.chunk_size = int(sample_rate * chunk_duration)
         self.audio_queue = queue.Queue()
         self.running = False
-        
+        self.device_index = device_index
+
     def start(self):
         """Start recording audio"""
         self.running = True
@@ -71,10 +118,11 @@ class AudioRecorder:
                 channels=1,
                 rate=self.sample_rate,
                 input=True,
-                frames_per_buffer=1024
+                frames_per_buffer=1024,
+                input_device_index=self.device_index
             )
             
-            logger.info(f"Listening on microphone at {self.sample_rate}Hz...")
+            logger.info(f"Listening on microphone at {self.sample_rate}Hz (device {self.device_index})...")
             audio_buffer = []
             
             while self.running:
@@ -160,13 +208,15 @@ class SpeakerbotClient:
             
         if self.connected:
             try:
+                id = random.randrange(10000, 99999)
                 message = json.dumps({
-                    "type": "transcription",
-                    "text": text,
-                    "timestamp": time.time()
+                    "request": "Speak",
+                    "id": f"{id}",
+                    "voice": f"{VOICE_NAME}",
+                    "message": f"{text}"
                 })
                 await self.websocket.send(message)
-                logger.info(f"Sent: {text}")
+                logger.info(f"Sent (ID {id}): {text}")
             except Exception as e:
                 logger.error(f"Error sending transcription: {e}")
                 self.connected = False
@@ -195,6 +245,15 @@ class SpeechToTextApp:
         # Connect to Speakerbot
         await self.client.connect()
         
+        # Select microphone
+        mic_selector = MicrophoneSelector()
+        device_index = mic_selector.show()
+        if device_index is not None:
+            self.recorder = AudioRecorder(device_index=device_index)
+        else:
+            logger.error("No microphone selected, exiting...")
+            return
+
         # Start audio recording
         self.recorder.start()
         self.running = True

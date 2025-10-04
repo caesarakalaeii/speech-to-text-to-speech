@@ -209,3 +209,8 @@ __marimo__/
 # Project specific
 .env
 test_imports.py
+
+# Windows
+*.bat.bak
+desktop.ini
+Thumbs.db

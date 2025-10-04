@@ -20,7 +20,31 @@ Simple locally hosted Whisper application to generate speech transcriptions and 
 
 ## Quick Start
 
-### Method 1: Bash Script Setup (Recommended)
+### Method 1: Automated Setup Scripts
+
+#### Windows
+
+1. Clone the repository:
+```cmd
+git clone https://github.com/caesarakalaeii/speech-to-text-to-speech.git
+cd speech-to-text-to-speech
+```
+
+2. Run the setup script:
+```cmd
+setup.bat
+```
+
+3. Configure your settings:
+   - Open `.env` in your favorite text editor
+   - Set your Speakerbot WebSocket URL
+
+4. Run the application:
+```cmd
+run.bat
+```
+
+#### Linux/macOS
 
 1. Clone the repository:
 ```bash
@@ -92,6 +116,30 @@ MIN_SPEECH_DURATION=0.5
 
 If you prefer manual installation:
 
+### Windows
+
+```cmd
+REM Install ffmpeg (using Chocolatey or Scoop)
+choco install ffmpeg
+REM OR: scoop install ffmpeg
+REM OR download from: https://www.gyan.dev/ffmpeg/builds/
+
+REM Create virtual environment
+python -m venv venv
+venv\Scripts\activate.bat
+
+REM Install Python dependencies
+pip install -r requirements.txt
+
+REM Note: If PyAudio installation fails, download a pre-built wheel from:
+REM https://www.lfd.uci.edu/~gohlke/pythonlibs/#pyaudio
+REM Then install with: pip install PyAudio-X.X.X-cpXX-cpXX-win_amd64.whl
+
+REM Copy and configure environment
+copy .env.example .env
+notepad .env
+```
+
 ### Linux/Ubuntu
 
 ```bash
@@ -159,6 +207,7 @@ The application sends JSON messages to Speakerbot in the following format:
 - Check microphone permissions
 - Verify microphone is selected as default input device
 - Adjust `SILENCE_THRESHOLD` in `.env` (lower = more sensitive)
+- **Windows**: Check Privacy Settings > Microphone and ensure apps have access
 
 ### High CPU usage
 
@@ -170,6 +219,18 @@ The application sends JSON messages to Speakerbot in the following format:
 - Verify Speakerbot is running
 - Check `SPEAKERBOT_WEBSOCKET_URL` in `.env`
 - Ensure firewall allows WebSocket connections
+
+### PyAudio installation fails on Windows
+
+- Install Microsoft C++ Build Tools from: https://visualstudio.microsoft.com/visual-cpp-build-tools/
+- OR download a pre-built PyAudio wheel from: https://www.lfd.uci.edu/~gohlke/pythonlibs/#pyaudio
+- Install the wheel with: `pip install PyAudio-X.X.X-cpXX-cpXX-win_amd64.whl`
+
+### FFmpeg not found on Windows
+
+- Install using Chocolatey: `choco install ffmpeg`
+- OR install using Scoop: `scoop install ffmpeg`
+- OR download from https://www.gyan.dev/ffmpeg/builds/ and add to PATH
 
 ### CUDA/GPU errors with Docker
 

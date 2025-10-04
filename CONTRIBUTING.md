@@ -12,9 +12,8 @@ Thank you for your interest in contributing! This document provides guidelines f
    ```
 
 3. Run the setup script:
-   ```bash
-   ./setup.sh
-   ```
+   - **Windows**: `setup.bat`
+   - **Linux/macOS**: `./setup.sh`
 
 4. Create a new branch for your feature:
    ```bash

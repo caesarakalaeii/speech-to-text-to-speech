@@ -205,3 +205,12 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Project specific
+.env
+test_imports.py
+
+# Windows
+*.bat.bak
+desktop.ini
+Thumbs.db

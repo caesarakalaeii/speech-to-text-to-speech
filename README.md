@@ -11,6 +11,10 @@ Simple locally hosted Whisper application to generate speech transcriptions and 
 - 🐳 Docker support with GPU passthrough
 - 🚀 Easy setup with automated bash script
 
+## 📚 Tutorials
+
+**NEW!** [Complete Windows Setup Guide with Google Cloud TTS and Streamer Bot](WINDOWS_GOOGLE_CLOUD_TTS_STREAMER_BOT_TUTORIAL.md) - A comprehensive step-by-step tutorial covering everything from installation to advanced configuration.
+
 ## Requirements
 
 - Python 3.8 or higher

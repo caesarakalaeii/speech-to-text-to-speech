@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Speech-to-Text-to-Speech Application
-Captures audio from microphone, transcribes using Whisper, and sends to Speakerbot via WebSocket
+Captures audio from microphone, transcribes using Whisper, and sends to TTS service (Speakerbot or Neuphonic)
 """
 import os
 import sys
@@ -17,6 +17,7 @@ import numpy as np
 import pyaudio
 import whisper
 import websockets
+import aiohttp
 import tkinter as tk
 from tkinter import ttk, messagebox
 
@@ -24,13 +25,16 @@ from tkinter import ttk, messagebox
 load_dotenv()
 
 # Configuration
+TTS_SERVICE = os.getenv("TTS_SERVICE", "speakerbot").lower()
 WEBSOCKET_URL = os.getenv("SPEAKERBOT_WEBSOCKET_URL", "ws://localhost:7585/speak")
+VOICE_NAME = os.getenv("VOICE_NAME", "Sally")
+NEUPHONIC_API_KEY = os.getenv("NEUPHONIC_API_KEY", "")
+NEUPHONIC_VOICE_ID = os.getenv("NEUPHONIC_VOICE_ID", "")
 WHISPER_MODEL = os.getenv("WHISPER_MODEL", "base")
 SAMPLE_RATE = int(os.getenv("SAMPLE_RATE", "16000"))
 CHUNK_DURATION = float(os.getenv("CHUNK_DURATION", "3.0"))
 SILENCE_THRESHOLD = float(os.getenv("SILENCE_THRESHOLD", "0.01"))
 MIN_SPEECH_DURATION = float(os.getenv("MIN_SPEECH_DURATION", "0.5"))
-VOICE_NAME = os.getenv("VOICE_NAME", "Sally")
 
 # Setup logging
 logging.basicConfig(
@@ -229,20 +233,91 @@ class SpeakerbotClient:
             logger.info("Disconnected from Speakerbot")
 
 
+class NeurophonicClient:
+    """HTTP client for Neuphonic TTS API"""
+    
+    def __init__(self, api_key=NEUPHONIC_API_KEY, voice_id=NEUPHONIC_VOICE_ID):
+        self.api_key = api_key
+        self.voice_id = voice_id
+        self.api_url = "https://api.neuphonic.com/v1/tts"
+        self.session = None
+        self.connected = False
+        
+    async def connect(self):
+        """Initialize HTTP session"""
+        try:
+            if not self.api_key:
+                logger.error("Neuphonic API key not configured")
+                self.connected = False
+                return
+            
+            self.session = aiohttp.ClientSession(
+                headers={
+                    "Authorization": f"Bearer {self.api_key}",
+                    "Content-Type": "application/json"
+                }
+            )
+            self.connected = True
+            logger.info("Initialized Neuphonic TTS client")
+        except Exception as e:
+            logger.error(f"Failed to initialize Neuphonic client: {e}")
+            self.connected = False
+            
+    async def send_transcription(self, text):
+        """Send transcription to Neuphonic TTS API"""
+        if not self.connected:
+            logger.warning("Neuphonic client not initialized, attempting to connect...")
+            await self.connect()
+            
+        if self.connected and self.session:
+            try:
+                payload = {
+                    "text": text,
+                    "voice": self.voice_id
+                }
+                
+                async with self.session.post(self.api_url, json=payload) as response:
+                    if response.status == 200:
+                        logger.info(f"Sent to Neuphonic: {text}")
+                    else:
+                        error_text = await response.text()
+                        logger.error(f"Neuphonic API error (status {response.status}): {error_text}")
+                        
+            except Exception as e:
+                logger.error(f"Error sending to Neuphonic: {e}")
+                
+    async def close(self):
+        """Close HTTP session"""
+        if self.session:
+            await self.session.close()
+            self.connected = False
+            logger.info("Closed Neuphonic client")
+
+
+def create_tts_client():
+    """Factory function to create appropriate TTS client based on configuration"""
+    if TTS_SERVICE == "neuphonic":
+        logger.info("Using Neuphonic TTS service")
+        return NeurophonicClient()
+    else:
+        logger.info("Using Speakerbot TTS service")
+        return SpeakerbotClient()
+
+
 class SpeechToTextApp:
     """Main application class"""
     
     def __init__(self):
         self.recorder = AudioRecorder()
         self.transcriber = WhisperTranscriber()
-        self.client = SpeakerbotClient()
+        self.client = create_tts_client()
         self.running = False
         
     async def run(self):
         """Run the main application loop"""
         logger.info("Starting Speech-to-Text application...")
         
-        # Connect to Speakerbot
+        # Connect to TTS service
         await self.client.connect()
         
         # Select microphone
@@ -268,7 +343,7 @@ class SpeechToTextApp:
                     text = self.transcriber.transcribe(audio_chunk)
                     
                     if text:
-                        # Send to Speakerbot
+                        # Send to TTS service
                         await self.client.send_transcription(text)
                         
                 # Small delay to prevent tight loop

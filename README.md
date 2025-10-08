@@ -6,7 +6,7 @@ Simple locally hosted Whisper application to generate speech transcriptions and 
 
 - 🎤 Real-time audio capture from microphone
 - 🧠 Local speech-to-text using OpenAI Whisper
-- 🔌 WebSocket client for Speakerbot integration
+- 🔌 Multiple TTS service options: Speakerbot WebSocket or Neuphonic API
 - ⚙️ Configurable via environment variables
 - 🐳 Docker support with GPU passthrough
 - 🚀 Easy setup with automated bash script
@@ -41,7 +41,8 @@ setup.bat
 
 3. Configure your settings:
    - Open `.env` in your favorite text editor
-   - Set your Speakerbot WebSocket URL
+   - Set your TTS service (speakerbot or neuphonic)
+   - Configure the appropriate settings for your chosen TTS service
 
 4. Run the application:
 ```cmd
@@ -64,7 +65,7 @@ chmod +x setup.sh
 
 3. Configure your settings:
 ```bash
-# Edit .env to set your Speakerbot WebSocket URL
+# Edit .env to set your TTS service and configuration
 nano .env
 ```
 
@@ -90,8 +91,16 @@ For GPU support, ensure you have:
 Edit the `.env` file to customize settings:
 
 ```bash
-# Speakerbot WebSocket URL
+# TTS Service: speakerbot or neuphonic
+TTS_SERVICE=speakerbot
+
+# Speakerbot WebSocket URL (used when TTS_SERVICE=speakerbot)
 SPEAKERBOT_WEBSOCKET_URL=ws://localhost:8080
+VOICE_NAME=Sally
+
+# Neuphonic API settings (used when TTS_SERVICE=neuphonic)
+NEUPHONIC_API_KEY=your_neuphonic_api_key_here
+NEUPHONIC_VOICE_ID=your_voice_id_here
 
 # Whisper model size: tiny, base, small, medium, large
 # Larger models are more accurate but slower
@@ -107,6 +116,21 @@ SILENCE_THRESHOLD=0.01
 # Minimum speech duration in seconds
 MIN_SPEECH_DURATION=0.5
 ```
+
+### TTS Service Options
+
+#### Speakerbot (Default)
+- Connects to a local Speakerbot instance via WebSocket
+- Requires Speakerbot to be running locally
+- Set `TTS_SERVICE=speakerbot` in `.env`
+- Configure `SPEAKERBOT_WEBSOCKET_URL` and `VOICE_NAME`
+
+#### Neuphonic
+- Uses the Neuphonic TTS API (https://www.neuphonic.com/)
+- Requires a Neuphonic API key
+- Set `TTS_SERVICE=neuphonic` in `.env`
+- Configure `NEUPHONIC_API_KEY` and `NEUPHONIC_VOICE_ID`
+- Sign up at https://www.neuphonic.com/ to get your API key
 
 ### Whisper Model Options
 
@@ -188,21 +212,9 @@ Once running, the application will:
 1. Start listening to your microphone
 2. Detect speech segments based on audio energy
 3. Transcribe speech using Whisper
-4. Send transcriptions to your configured Speakerbot WebSocket endpoint
+4. Send transcriptions to your configured TTS service (Speakerbot or Neuphonic)
 
 Press `Ctrl+C` to stop the application.
-
-## WebSocket Message Format
-
-The application sends JSON messages to Speakerbot in the following format:
-
-```json
-{
-  "type": "transcription",
-  "text": "transcribed speech text",
-  "timestamp": 1234567890.123
-}
-```
 
 ## Troubleshooting
 
@@ -218,11 +230,17 @@ The application sends JSON messages to Speakerbot in the following format:
 - Use a smaller Whisper model (`tiny` or `base`)
 - Increase `CHUNK_DURATION` to process less frequently
 
-### WebSocket connection fails
+### TTS service connection fails
 
+**For Speakerbot:**
 - Verify Speakerbot is running
 - Check `SPEAKERBOT_WEBSOCKET_URL` in `.env`
 - Ensure firewall allows WebSocket connections
+
+**For Neuphonic:**
+- Verify your API key is correct
+- Check you have an active subscription
+- Ensure you have internet connectivity
 
 ### PyAudio installation fails on Windows
 

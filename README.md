@@ -14,7 +14,9 @@ Simple locally hosted Whisper application to generate speech transcriptions and 
 
 ## 📚 Tutorials
 
-**NEW!** [Complete Windows Setup Guide with Google Cloud TTS and Streamer Bot](WINDOWS_GOOGLE_CLOUD_TTS_STREAMER_BOT_TUTORIAL.md) - A comprehensive step-by-step tutorial covering everything from installation to advanced configuration.
+**For Non-Technical Users:**
+- 🆕 [Windows Setup Guide with Local NeuTTS (FREE, Offline)](WINDOWS_NEUTTS_LOCAL_TTS_TUTORIAL.md) - Complete beginner-friendly guide for setting up local text-to-speech with voice cloning. No cloud services or fees required!
+- [Windows Setup Guide with Google Cloud TTS and Streamer Bot](WINDOWS_GOOGLE_CLOUD_TTS_STREAMER_BOT_TUTORIAL.md) - Comprehensive guide for cloud-based TTS with Streamer Bot integration.
 
 ## Requirements
 

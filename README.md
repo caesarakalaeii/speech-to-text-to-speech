@@ -6,7 +6,8 @@ Simple locally hosted Whisper application to generate speech transcriptions and 
 
 - 🎤 Real-time audio capture from microphone
 - 🧠 Local speech-to-text using OpenAI Whisper
-- 🔌 WebSocket client for Speakerbot integration
+- 🔌 Multiple TTS service options: Speakerbot WebSocket or NeuTTS Air (local neural TTS)
+- 🎭 Voice cloning support with NeuTTS Air
 - ⚙️ Configurable via environment variables
 - 🐳 Docker support with GPU passthrough
 - 🚀 Easy setup with automated bash script
@@ -41,7 +42,9 @@ setup.bat
 
 3. Configure your settings:
    - Open `.env` in your favorite text editor
-   - Set your Speakerbot WebSocket URL
+   - Set your TTS service (speakerbot or neutts)
+   - Configure the appropriate settings for your chosen TTS service
+   - If using NeuTTS: install additional dependencies with `pip install -r requirements-neutts.txt`
 
 4. Run the application:
 ```cmd
@@ -64,7 +67,7 @@ chmod +x setup.sh
 
 3. Configure your settings:
 ```bash
-# Edit .env to set your Speakerbot WebSocket URL
+# Edit .env to set your TTS service and configuration
 nano .env
 ```
 
@@ -90,8 +93,23 @@ For GPU support, ensure you have:
 Edit the `.env` file to customize settings:
 
 ```bash
-# Speakerbot WebSocket URL
+# TTS Service: speakerbot or neutts
+TTS_SERVICE=speakerbot
+
+# Speakerbot WebSocket URL (used when TTS_SERVICE=speakerbot)
 SPEAKERBOT_WEBSOCKET_URL=ws://localhost:8080
+VOICE_NAME=Sally
+
+# NeuTTS Air settings (used when TTS_SERVICE=neutts)
+# Backbone model: neuphonic/neutts-air, neuphonic/neutts-air-q4-gguf, neuphonic/neutts-air-q8-gguf
+NEUTTS_BACKBONE=neuphonic/neutts-air-q4-gguf
+NEUTTS_BACKBONE_DEVICE=cpu
+NEUTTS_CODEC=neuphonic/neucodec
+NEUTTS_CODEC_DEVICE=cpu
+# Path to reference audio file (3-15 seconds, mono, 16-44kHz, .wav format)
+NEUTTS_REF_AUDIO=samples/reference.wav
+# Path to text file containing transcription of reference audio
+NEUTTS_REF_TEXT=samples/reference.txt
 
 # Whisper model size: tiny, base, small, medium, large
 # Larger models are more accurate but slower
@@ -107,6 +125,27 @@ SILENCE_THRESHOLD=0.01
 # Minimum speech duration in seconds
 MIN_SPEECH_DURATION=0.5
 ```
+
+### TTS Service Options
+
+#### Speakerbot (Default)
+- Connects to a local Speakerbot instance via WebSocket
+- Requires Speakerbot to be running locally
+- Set `TTS_SERVICE=speakerbot` in `.env`
+- Configure `SPEAKERBOT_WEBSOCKET_URL` and `VOICE_NAME`
+
+#### NeuTTS Air
+- Uses the locally-run NeuTTS Air neural TTS model (https://github.com/neuphonic/neutts-air)
+- Runs entirely on your device - no API calls or internet required
+- Supports instant voice cloning from a reference audio sample
+- Set `TTS_SERVICE=neutts` in `.env`
+- Install additional dependencies: `pip install -r requirements-neutts.txt`
+- Install espeak: `brew install espeak` (macOS) or `sudo apt install espeak` (Linux)
+- Configure reference audio and text files for voice cloning
+- Choose backbone model based on your device:
+  - `neuphonic/neutts-air-q4-gguf`: Recommended for most devices (with llama-cpp-python)
+  - `neuphonic/neutts-air-q8-gguf`: Better quality, more resources
+  - `neuphonic/neutts-air`: Full PyTorch model, highest quality but slowest
 
 ### Whisper Model Options
 
@@ -188,21 +227,9 @@ Once running, the application will:
 1. Start listening to your microphone
 2. Detect speech segments based on audio energy
 3. Transcribe speech using Whisper
-4. Send transcriptions to your configured Speakerbot WebSocket endpoint
+4. Generate speech using your configured TTS service (Speakerbot or NeuTTS Air)
 
 Press `Ctrl+C` to stop the application.
-
-## WebSocket Message Format
-
-The application sends JSON messages to Speakerbot in the following format:
-
-```json
-{
-  "type": "transcription",
-  "text": "transcribed speech text",
-  "timestamp": 1234567890.123
-}
-```
 
 ## Troubleshooting
 
@@ -218,11 +245,19 @@ The application sends JSON messages to Speakerbot in the following format:
 - Use a smaller Whisper model (`tiny` or `base`)
 - Increase `CHUNK_DURATION` to process less frequently
 
-### WebSocket connection fails
+### TTS service connection fails
 
+**For Speakerbot:**
 - Verify Speakerbot is running
 - Check `SPEAKERBOT_WEBSOCKET_URL` in `.env`
 - Ensure firewall allows WebSocket connections
+
+**For NeuTTS Air:**
+- Verify you installed dependencies: `pip install -r requirements-neutts.txt`
+- Check espeak is installed (`brew install espeak` or `sudo apt install espeak`)
+- Verify reference audio and text files exist and are in correct format
+- Check that backbone model is downloaded (happens automatically on first run)
+- Ensure sufficient RAM/VRAM for the model (Q4 GGUF needs ~2GB)
 
 ### PyAudio installation fails on Windows
 

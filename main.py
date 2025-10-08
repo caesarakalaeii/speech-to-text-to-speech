@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Speech-to-Text-to-Speech Application
-Captures audio from microphone, transcribes using Whisper, and sends to Speakerbot via WebSocket
+Captures audio from microphone, transcribes using Whisper, and sends to TTS service (Speakerbot or NeuTTS Air)
 """
 import os
 import sys
@@ -24,13 +24,20 @@ from tkinter import ttk, messagebox
 load_dotenv()
 
 # Configuration
+TTS_SERVICE = os.getenv("TTS_SERVICE", "speakerbot").lower()
 WEBSOCKET_URL = os.getenv("SPEAKERBOT_WEBSOCKET_URL", "ws://localhost:7585/speak")
+VOICE_NAME = os.getenv("VOICE_NAME", "Sally")
+NEUTTS_BACKBONE = os.getenv("NEUTTS_BACKBONE", "neuphonic/neutts-air-q4-gguf")
+NEUTTS_BACKBONE_DEVICE = os.getenv("NEUTTS_BACKBONE_DEVICE", "cpu")
+NEUTTS_CODEC = os.getenv("NEUTTS_CODEC", "neuphonic/neucodec")
+NEUTTS_CODEC_DEVICE = os.getenv("NEUTTS_CODEC_DEVICE", "cpu")
+NEUTTS_REF_AUDIO = os.getenv("NEUTTS_REF_AUDIO", "")
+NEUTTS_REF_TEXT = os.getenv("NEUTTS_REF_TEXT", "")
 WHISPER_MODEL = os.getenv("WHISPER_MODEL", "base")
 SAMPLE_RATE = int(os.getenv("SAMPLE_RATE", "16000"))
 CHUNK_DURATION = float(os.getenv("CHUNK_DURATION", "3.0"))
 SILENCE_THRESHOLD = float(os.getenv("SILENCE_THRESHOLD", "0.01"))
 MIN_SPEECH_DURATION = float(os.getenv("MIN_SPEECH_DURATION", "0.5"))
-VOICE_NAME = os.getenv("VOICE_NAME", "Sally")
 
 # Setup logging
 logging.basicConfig(
@@ -229,20 +236,125 @@ class SpeakerbotClient:
             logger.info("Disconnected from Speakerbot")
 
 
+class NeuTTSClient:
+    """Local NeuTTS Air TTS client"""
+    
+    def __init__(self, backbone=NEUTTS_BACKBONE, backbone_device=NEUTTS_BACKBONE_DEVICE,
+                 codec=NEUTTS_CODEC, codec_device=NEUTTS_CODEC_DEVICE,
+                 ref_audio=NEUTTS_REF_AUDIO, ref_text=NEUTTS_REF_TEXT):
+        self.backbone = backbone
+        self.backbone_device = backbone_device
+        self.codec = codec
+        self.codec_device = codec_device
+        self.ref_audio = ref_audio
+        self.ref_text = ref_text
+        self.tts = None
+        self.ref_codes = None
+        self.connected = False
+        
+    async def connect(self):
+        """Initialize NeuTTS model"""
+        try:
+            # Import here to avoid requiring it if not used
+            from neuttsair.neutts import NeuTTSAir
+            import soundfile as sf
+            
+            if not self.ref_audio or not os.path.exists(self.ref_audio):
+                logger.error(f"Reference audio file not found: {self.ref_audio}")
+                self.connected = False
+                return
+            
+            if not self.ref_text or not os.path.exists(self.ref_text):
+                logger.error(f"Reference text file not found: {self.ref_text}")
+                self.connected = False
+                return
+            
+            logger.info(f"Loading NeuTTS Air model (backbone: {self.backbone})...")
+            self.tts = NeuTTSAir(
+                backbone_repo=self.backbone,
+                backbone_device=self.backbone_device,
+                codec_repo=self.codec,
+                codec_device=self.codec_device
+            )
+            
+            # Load and encode reference audio
+            logger.info(f"Encoding reference audio from {self.ref_audio}...")
+            self.ref_codes = self.tts.encode_reference(self.ref_audio)
+            
+            # Load reference text
+            with open(self.ref_text, 'r') as f:
+                self.ref_text_content = f.read().strip()
+            
+            self.connected = True
+            logger.info("NeuTTS Air model loaded successfully")
+        except ImportError as e:
+            logger.error(f"Failed to import NeuTTS Air. Install with: pip install -r requirements-neutts.txt")
+            logger.error(f"Error: {e}")
+            self.connected = False
+        except Exception as e:
+            logger.error(f"Failed to initialize NeuTTS client: {e}")
+            self.connected = False
+            
+    async def send_transcription(self, text):
+        """Generate speech from transcription using NeuTTS"""
+        if not self.connected:
+            logger.warning("NeuTTS client not initialized, attempting to connect...")
+            await self.connect()
+            
+        if self.connected and self.tts:
+            try:
+                import soundfile as sf
+                import time
+                
+                # Generate speech
+                wav = self.tts.infer(text, self.ref_codes, self.ref_text_content)
+                
+                # Save to temporary file and play
+                output_file = f"/tmp/neutts_output_{int(time.time() * 1000)}.wav"
+                sf.write(output_file, wav, 24000)
+                
+                logger.info(f"Generated speech for: {text}")
+                logger.info(f"Saved to: {output_file}")
+                
+                # Note: Actual audio playback would need to be implemented
+                # This could be done with pygame, pyaudio, or system commands
+                # For now, we just log that the file was created
+                
+            except Exception as e:
+                logger.error(f"Error generating speech with NeuTTS: {e}")
+                
+    async def close(self):
+        """Close NeuTTS client"""
+        self.tts = None
+        self.ref_codes = None
+        self.connected = False
+        logger.info("Closed NeuTTS client")
+
+
+def create_tts_client():
+    """Factory function to create appropriate TTS client based on configuration"""
+    if TTS_SERVICE == "neutts":
+        logger.info("Using NeuTTS Air local TTS service")
+        return NeuTTSClient()
+    else:
+        logger.info("Using Speakerbot TTS service")
+        return SpeakerbotClient()
+
+
 class SpeechToTextApp:
     """Main application class"""
     
     def __init__(self):
         self.recorder = AudioRecorder()
         self.transcriber = WhisperTranscriber()
-        self.client = SpeakerbotClient()
+        self.client = create_tts_client()
         self.running = False
         
     async def run(self):
         """Run the main application loop"""
         logger.info("Starting Speech-to-Text application...")
         
-        # Connect to Speakerbot
+        # Connect to TTS service
         await self.client.connect()
         
         # Select microphone
@@ -268,7 +380,7 @@ class SpeechToTextApp:
                     text = self.transcriber.transcribe(audio_chunk)
                     
                     if text:
-                        # Send to Speakerbot
+                        # Send to TTS service
                         await self.client.send_transcription(text)
                         
                 # Small delay to prevent tight loop

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Speech-to-Text-to-Speech Application
-Captures audio from microphone, transcribes using Whisper, and sends to TTS service (Speakerbot or Neuphonic)
+Captures audio from microphone, transcribes using Whisper, and sends to TTS service (Speakerbot or NeuTTS Air)
 """
 import os
 import sys
@@ -17,7 +17,6 @@ import numpy as np
 import pyaudio
 import whisper
 import websockets
-import aiohttp
 import tkinter as tk
 from tkinter import ttk, messagebox
 
@@ -28,8 +27,12 @@ load_dotenv()
 TTS_SERVICE = os.getenv("TTS_SERVICE", "speakerbot").lower()
 WEBSOCKET_URL = os.getenv("SPEAKERBOT_WEBSOCKET_URL", "ws://localhost:7585/speak")
 VOICE_NAME = os.getenv("VOICE_NAME", "Sally")
-NEUPHONIC_API_KEY = os.getenv("NEUPHONIC_API_KEY", "")
-NEUPHONIC_VOICE_ID = os.getenv("NEUPHONIC_VOICE_ID", "")
+NEUTTS_BACKBONE = os.getenv("NEUTTS_BACKBONE", "neuphonic/neutts-air-q4-gguf")
+NEUTTS_BACKBONE_DEVICE = os.getenv("NEUTTS_BACKBONE_DEVICE", "cpu")
+NEUTTS_CODEC = os.getenv("NEUTTS_CODEC", "neuphonic/neucodec")
+NEUTTS_CODEC_DEVICE = os.getenv("NEUTTS_CODEC_DEVICE", "cpu")
+NEUTTS_REF_AUDIO = os.getenv("NEUTTS_REF_AUDIO", "")
+NEUTTS_REF_TEXT = os.getenv("NEUTTS_REF_TEXT", "")
 WHISPER_MODEL = os.getenv("WHISPER_MODEL", "base")
 SAMPLE_RATE = int(os.getenv("SAMPLE_RATE", "16000"))
 CHUNK_DURATION = float(os.getenv("CHUNK_DURATION", "3.0"))
@@ -233,72 +236,106 @@ class SpeakerbotClient:
             logger.info("Disconnected from Speakerbot")
 
 
-class NeurophonicClient:
-    """HTTP client for Neuphonic TTS API"""
+class NeuTTSClient:
+    """Local NeuTTS Air TTS client"""
     
-    def __init__(self, api_key=NEUPHONIC_API_KEY, voice_id=NEUPHONIC_VOICE_ID):
-        self.api_key = api_key
-        self.voice_id = voice_id
-        self.api_url = "https://api.neuphonic.com/v1/tts"
-        self.session = None
+    def __init__(self, backbone=NEUTTS_BACKBONE, backbone_device=NEUTTS_BACKBONE_DEVICE,
+                 codec=NEUTTS_CODEC, codec_device=NEUTTS_CODEC_DEVICE,
+                 ref_audio=NEUTTS_REF_AUDIO, ref_text=NEUTTS_REF_TEXT):
+        self.backbone = backbone
+        self.backbone_device = backbone_device
+        self.codec = codec
+        self.codec_device = codec_device
+        self.ref_audio = ref_audio
+        self.ref_text = ref_text
+        self.tts = None
+        self.ref_codes = None
         self.connected = False
         
     async def connect(self):
-        """Initialize HTTP session"""
+        """Initialize NeuTTS model"""
         try:
-            if not self.api_key:
-                logger.error("Neuphonic API key not configured")
+            # Import here to avoid requiring it if not used
+            from neuttsair.neutts import NeuTTSAir
+            import soundfile as sf
+            
+            if not self.ref_audio or not os.path.exists(self.ref_audio):
+                logger.error(f"Reference audio file not found: {self.ref_audio}")
                 self.connected = False
                 return
             
-            self.session = aiohttp.ClientSession(
-                headers={
-                    "Authorization": f"Bearer {self.api_key}",
-                    "Content-Type": "application/json"
-                }
+            if not self.ref_text or not os.path.exists(self.ref_text):
+                logger.error(f"Reference text file not found: {self.ref_text}")
+                self.connected = False
+                return
+            
+            logger.info(f"Loading NeuTTS Air model (backbone: {self.backbone})...")
+            self.tts = NeuTTSAir(
+                backbone_repo=self.backbone,
+                backbone_device=self.backbone_device,
+                codec_repo=self.codec,
+                codec_device=self.codec_device
             )
+            
+            # Load and encode reference audio
+            logger.info(f"Encoding reference audio from {self.ref_audio}...")
+            self.ref_codes = self.tts.encode_reference(self.ref_audio)
+            
+            # Load reference text
+            with open(self.ref_text, 'r') as f:
+                self.ref_text_content = f.read().strip()
+            
             self.connected = True
-            logger.info("Initialized Neuphonic TTS client")
+            logger.info("NeuTTS Air model loaded successfully")
+        except ImportError as e:
+            logger.error(f"Failed to import NeuTTS Air. Install with: pip install -r requirements-neutts.txt")
+            logger.error(f"Error: {e}")
+            self.connected = False
         except Exception as e:
-            logger.error(f"Failed to initialize Neuphonic client: {e}")
+            logger.error(f"Failed to initialize NeuTTS client: {e}")
             self.connected = False
             
     async def send_transcription(self, text):
-        """Send transcription to Neuphonic TTS API"""
+        """Generate speech from transcription using NeuTTS"""
         if not self.connected:
-            logger.warning("Neuphonic client not initialized, attempting to connect...")
+            logger.warning("NeuTTS client not initialized, attempting to connect...")
             await self.connect()
             
-        if self.connected and self.session:
+        if self.connected and self.tts:
             try:
-                payload = {
-                    "text": text,
-                    "voice": self.voice_id
-                }
+                import soundfile as sf
+                import time
                 
-                async with self.session.post(self.api_url, json=payload) as response:
-                    if response.status == 200:
-                        logger.info(f"Sent to Neuphonic: {text}")
-                    else:
-                        error_text = await response.text()
-                        logger.error(f"Neuphonic API error (status {response.status}): {error_text}")
-                        
+                # Generate speech
+                wav = self.tts.infer(text, self.ref_codes, self.ref_text_content)
+                
+                # Save to temporary file and play
+                output_file = f"/tmp/neutts_output_{int(time.time() * 1000)}.wav"
+                sf.write(output_file, wav, 24000)
+                
+                logger.info(f"Generated speech for: {text}")
+                logger.info(f"Saved to: {output_file}")
+                
+                # Note: Actual audio playback would need to be implemented
+                # This could be done with pygame, pyaudio, or system commands
+                # For now, we just log that the file was created
+                
             except Exception as e:
-                logger.error(f"Error sending to Neuphonic: {e}")
+                logger.error(f"Error generating speech with NeuTTS: {e}")
                 
     async def close(self):
-        """Close HTTP session"""
-        if self.session:
-            await self.session.close()
-            self.connected = False
-            logger.info("Closed Neuphonic client")
+        """Close NeuTTS client"""
+        self.tts = None
+        self.ref_codes = None
+        self.connected = False
+        logger.info("Closed NeuTTS client")
 
 
 def create_tts_client():
     """Factory function to create appropriate TTS client based on configuration"""
-    if TTS_SERVICE == "neuphonic":
-        logger.info("Using Neuphonic TTS service")
-        return NeurophonicClient()
+    if TTS_SERVICE == "neutts":
+        logger.info("Using NeuTTS Air local TTS service")
+        return NeuTTSClient()
     else:
         logger.info("Using Speakerbot TTS service")
         return SpeakerbotClient()

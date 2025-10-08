@@ -1,0 +1,23 @@
+# NeuTTS Air dependencies
+# Install these if you want to use NeuTTS Air instead of Speakerbot
+# Installation: pip install -r requirements-neutts.txt
+
+# Core NeuTTS dependencies (from neutts-air repository)
+torch>=2.0.0
+torchaudio>=2.0.0
+transformers>=4.30.0
+phonemizer>=3.2.1
+soundfile>=0.12.1
+einops>=0.7.0
+tqdm>=4.65.0
+
+# Optional: For GGUF model support (recommended for lower latency)
+llama-cpp-python>=0.2.0
+
+# Optional: For ONNX decoder support (recommended for lower latency)
+onnxruntime>=1.16.0
+
+# Note: You also need to install espeak:
+# - macOS: brew install espeak
+# - Ubuntu/Debian: sudo apt install espeak
+# - Windows: Download from https://github.com/espeak-ng/espeak-ng/releases

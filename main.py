@@ -58,6 +58,18 @@ def list_microphones():
     return devices
 
 
+def list_output_devices():
+    """List all available audio output devices"""
+    p = pyaudio.PyAudio()
+    devices = []
+    for i in range(p.get_device_count()):
+        info = p.get_device_info_by_index(i)
+        if info.get('maxOutputChannels', 0) > 0:
+            devices.append((i, info['name']))
+    p.terminate()
+    return devices
+
+
 class MicrophoneSelector:
     def __init__(self):
         self.selected_index = None
@@ -87,6 +99,104 @@ class MicrophoneSelector:
     def show(self):
         self.root.mainloop()
         return self.selected_index
+
+
+class OutputDeviceSelector:
+    """GUI for selecting audio output device"""
+    
+    def __init__(self):
+        self.selected_index = None
+        self.root = tk.Tk()
+        self.root.title('Select Output Device')
+        self.devices = list_output_devices()
+        if not self.devices:
+            messagebox.showerror('Error', 'No output devices found!')
+            self.root.destroy()
+            return
+        tk.Label(self.root, text='Choose an output device:').pack(padx=10, pady=10)
+        self.combo = ttk.Combobox(self.root, values=[name for idx, name in self.devices], state='readonly')
+        self.combo.pack(padx=10, pady=10)
+        self.combo.current(0)
+        tk.Button(self.root, text='Select', command=self.select).pack(pady=10)
+        self.root.protocol('WM_DELETE_WINDOW', self.on_close)
+
+    def select(self):
+        idx = self.combo.current()
+        self.selected_index = self.devices[idx][0]
+        self.root.quit()
+
+    def on_close(self):
+        self.selected_index = None
+        self.root.quit()
+
+    def show(self):
+        self.root.mainloop()
+        return self.selected_index
+
+
+class AudioPlayer:
+    """Plays audio through output device with queue"""
+    
+    def __init__(self, device_index=None):
+        self.device_index = device_index
+        self.playback_queue = queue.Queue()
+        self.running = False
+        
+    def start(self):
+        """Start audio playback thread"""
+        self.running = True
+        self.thread = Thread(target=self._playback_loop)
+        self.thread.daemon = True
+        self.thread.start()
+        logger.info("Audio playback started")
+        
+    def stop(self):
+        """Stop audio playback thread"""
+        self.running = False
+        if hasattr(self, 'thread'):
+            self.thread.join()
+        logger.info("Audio playback stopped")
+        
+    def play(self, audio_data, sample_rate=24000):
+        """Queue audio data for playback"""
+        self.playback_queue.put((audio_data, sample_rate))
+        
+    def _playback_loop(self):
+        """Playback loop running in separate thread"""
+        p = pyaudio.PyAudio()
+        
+        try:
+            while self.running:
+                try:
+                    audio_data, sample_rate = self.playback_queue.get(timeout=0.1)
+                    
+                    # Open stream for this audio
+                    stream = p.open(
+                        format=pyaudio.paFloat32,
+                        channels=1,
+                        rate=sample_rate,
+                        output=True,
+                        output_device_index=self.device_index
+                    )
+                    
+                    # Convert to float32 if needed
+                    if audio_data.dtype != np.float32:
+                        audio_data = audio_data.astype(np.float32)
+                    
+                    # Play audio
+                    stream.write(audio_data.tobytes())
+                    stream.stop_stream()
+                    stream.close()
+                    
+                    logger.info("Audio playback completed")
+                    
+                except queue.Empty:
+                    continue
+                except Exception as e:
+                    logger.error(f"Error during audio playback: {e}")
+                    
+        finally:
+            p.terminate()
 
 
 class AudioRecorder:
@@ -241,7 +351,7 @@ class NeuTTSClient:
     
     def __init__(self, backbone=NEUTTS_BACKBONE, backbone_device=NEUTTS_BACKBONE_DEVICE,
                  codec=NEUTTS_CODEC, codec_device=NEUTTS_CODEC_DEVICE,
-                 ref_audio=NEUTTS_REF_AUDIO, ref_text=NEUTTS_REF_TEXT):
+                 ref_audio=NEUTTS_REF_AUDIO, ref_text=NEUTTS_REF_TEXT, audio_player=None):
         self.backbone = backbone
         self.backbone_device = backbone_device
         self.codec = codec
@@ -251,6 +361,7 @@ class NeuTTSClient:
         self.tts = None
         self.ref_codes = None
         self.connected = False
+        self.audio_player = audio_player
         
     async def connect(self):
         """Initialize NeuTTS model"""
@@ -303,22 +414,17 @@ class NeuTTSClient:
             
         if self.connected and self.tts:
             try:
-                import soundfile as sf
-                import time
-                
                 # Generate speech
                 wav = self.tts.infer(text, self.ref_codes, self.ref_text_content)
                 
-                # Save to temporary file and play
-                output_file = f"/tmp/neutts_output_{int(time.time() * 1000)}.wav"
-                sf.write(output_file, wav, 24000)
-                
                 logger.info(f"Generated speech for: {text}")
-                logger.info(f"Saved to: {output_file}")
                 
-                # Note: Actual audio playback would need to be implemented
-                # This could be done with pygame, pyaudio, or system commands
-                # For now, we just log that the file was created
+                # Play audio if audio player is available
+                if self.audio_player:
+                    self.audio_player.play(wav, sample_rate=24000)
+                    logger.info("Audio queued for playback")
+                else:
+                    logger.warning("No audio player available, audio not played")
                 
             except Exception as e:
                 logger.error(f"Error generating speech with NeuTTS: {e}")
@@ -331,11 +437,11 @@ class NeuTTSClient:
         logger.info("Closed NeuTTS client")
 
 
-def create_tts_client():
+def create_tts_client(audio_player=None):
     """Factory function to create appropriate TTS client based on configuration"""
     if TTS_SERVICE == "neutts":
         logger.info("Using NeuTTS Air local TTS service")
-        return NeuTTSClient()
+        return NeuTTSClient(audio_player=audio_player)
     else:
         logger.info("Using Speakerbot TTS service")
         return SpeakerbotClient()
@@ -347,15 +453,13 @@ class SpeechToTextApp:
     def __init__(self):
         self.recorder = AudioRecorder()
         self.transcriber = WhisperTranscriber()
-        self.client = create_tts_client()
+        self.audio_player = None
+        self.client = None
         self.running = False
         
     async def run(self):
         """Run the main application loop"""
         logger.info("Starting Speech-to-Text application...")
-        
-        # Connect to TTS service
-        await self.client.connect()
         
         # Select microphone
         mic_selector = MicrophoneSelector()
@@ -365,6 +469,24 @@ class SpeechToTextApp:
         else:
             logger.error("No microphone selected, exiting...")
             return
+        
+        # Select output device (only for NeuTTS)
+        if TTS_SERVICE == "neutts":
+            output_selector = OutputDeviceSelector()
+            output_device_index = output_selector.show()
+            if output_device_index is not None:
+                self.audio_player = AudioPlayer(device_index=output_device_index)
+                self.audio_player.start()
+                logger.info(f"Audio player initialized with device {output_device_index}")
+            else:
+                logger.error("No output device selected, exiting...")
+                return
+        
+        # Create TTS client with audio player
+        self.client = create_tts_client(audio_player=self.audio_player)
+        
+        # Connect to TTS service
+        await self.client.connect()
 
         # Start audio recording
         self.recorder.start()
@@ -396,7 +518,10 @@ class SpeechToTextApp:
         logger.info("Shutting down...")
         self.running = False
         self.recorder.stop()
-        await self.client.close()
+        if self.audio_player:
+            self.audio_player.stop()
+        if self.client:
+            await self.client.close()
         logger.info("Application stopped")
 
 

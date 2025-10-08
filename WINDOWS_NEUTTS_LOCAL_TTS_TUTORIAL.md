@@ -23,6 +23,8 @@ This setup allows you to:
 - Transcribe speech locally using OpenAI Whisper (no internet needed)
 - Generate speech using NeuTTS Air's neural voice cloning (runs on your PC)
 - Clone any voice from a short audio sample (3-15 seconds)
+- Choose your input microphone and output speaker/headphones
+- Hear generated speech played back immediately through your selected device
 - Run everything offline after initial setup
 
 **Why use NeuTTS Air instead of cloud services?**
@@ -30,11 +32,12 @@ This setup allows you to:
 - ✅ **Runs offline** - No internet connection needed
 - ✅ **Privacy** - All processing stays on your computer
 - ✅ **Voice cloning** - Use any voice from a short audio sample
+- ✅ **Device control** - Choose your microphone and speakers
 - ✅ **No limits** - Generate unlimited speech
 
 **Architecture Flow:**
 ```
-Your Microphone → Whisper STT (local) → NeuTTS Air (local) → Audio Output
+Your Microphone → Whisper STT (local) → NeuTTS Air (local) → Queue → Selected Speaker/Headphones
 ```
 
 ---
@@ -483,10 +486,21 @@ Open `reference.txt` in Notepad to verify the text looks correct.
    
    **Be patient!** This is normal and only happens once.
 
-4. **Microphone Selection:**
+4. **Device Selection:**
+   
+   You'll see **two** device selection dialogs:
+   
+   **First - Microphone Selection:**
    - A window will appear showing available microphones
    - Select your microphone from the list
-   - Click **"OK"**
+   - Click **"Select"**
+   
+   **Second - Output Device Selection (NEW!):**
+   - A window will appear showing available speakers/headphones
+   - Select where you want to hear the generated speech
+   - Click **"Select"**
+   
+   This lets you choose different devices for input and output (e.g., USB microphone for recording, speakers for playback).
 
 5. **Check the console output:**
    You should see messages like:
@@ -497,6 +511,7 @@ Open `reference.txt` in Notepad to verify the text looks correct.
    Loading codec model: neuphonic/neucodec
    Loading reference audio: samples/reference.wav
    NeuTTS Air ready!
+   Audio playback started
    Audio recording started
    Listening for speech...
    ```
@@ -512,7 +527,8 @@ Open `reference.txt` in Notepad to verify the text looks correct.
    - Whisper transcribes your speech
    - The transcription appears in the console
    - NeuTTS generates speech in the cloned voice
-   - You hear the audio played back
+   - The audio is played through your selected output device (speakers/headphones)
+   - You hear the audio played back immediately
 
 3. **If you hear the cloned voice speaking your words—SUCCESS!** 🎉
 
@@ -613,16 +629,24 @@ If this shows version info, FFmpeg is installed correctly.
 ### Audio Issues
 
 **No audio is played back**
-- Check your Windows audio output device
+- Check if you selected the correct output device during startup
 - Make sure speakers/headphones are connected and turned on
 - Check volume is not muted
-- Try a different output device
+- Test your output device in Windows Sound settings
+- Try restarting the application and selecting a different output device
+- Check Windows Settings → System → Sound → Output device
+
+**Wrong output device selected**
+- Restart the application to see the output device selection dialog again
+- Make sure the device you want is set as default in Windows Sound settings
+- If you have multiple audio devices, try each one to find the right one
 
 **Microphone not detected**
 - Go to Windows Settings → System → Sound
 - Under "Input", make sure your microphone is listed and selected
 - Test your microphone by speaking—the input level should move
 - Grant microphone permissions to apps
+- Restart the application to see the microphone selection dialog again
 
 **Poor transcription quality**
 - Speak more clearly and slowly
@@ -835,7 +859,8 @@ Congratulations! You now have a fully local speech-to-text-to-speech system runn
 - ✅ Set up the speech-to-text-to-speech application
 - ✅ Installed NeuTTS Air for local voice generation
 - ✅ Created reference audio for voice cloning
-- ✅ Successfully transcribed your voice and heard it played back
+- ✅ Configured input (microphone) and output (speaker) devices
+- ✅ Successfully transcribed your voice and heard it played back through your chosen speakers
 - ✅ All running locally without internet or cloud services!
 
 ### Next Steps

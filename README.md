@@ -8,6 +8,7 @@ Simple locally hosted Whisper application to generate speech transcriptions and 
 - 🧠 Local speech-to-text using OpenAI Whisper
 - 🔌 Multiple TTS service options: Speakerbot WebSocket or NeuTTS Air (local neural TTS)
 - 🎭 Voice cloning support with NeuTTS Air
+- 🔊 Queue-based audio playback with output device selection (NeuTTS)
 - ⚙️ Configurable via environment variables
 - 🐳 Docker support with GPU passthrough
 - 🚀 Easy setup with automated bash script
@@ -138,6 +139,8 @@ MIN_SPEECH_DURATION=0.5
 - Uses the locally-run NeuTTS Air neural TTS model (https://github.com/neuphonic/neutts-air)
 - Runs entirely on your device - no API calls or internet required
 - Supports instant voice cloning from a reference audio sample
+- **Queue-based audio playback**: Generated speech is played through a selected output device
+- **Output device selection**: GUI dialog allows you to choose your preferred audio output
 - Set `TTS_SERVICE=neutts` in `.env`
 - Install additional dependencies: `pip install -r requirements-neutts.txt`
 - Install espeak: `brew install espeak` (macOS) or `sudo apt install espeak` (Linux)

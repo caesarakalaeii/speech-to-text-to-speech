@@ -353,6 +353,8 @@ function Install-BaseRequirements {
 
 # Ask about NeuTTS installation
 function Install-NeuTTS {
+    param([bool]$CudaInstalled = $false)
+    
     Write-Host "\n$('=' * 80)" -ForegroundColor Cyan; Write-Host "  NeuTTS Air - Local Neural TTS with Voice Cloning" -ForegroundColor Cyan; Write-Host "$('=' * 80)\n" -ForegroundColor Cyan
     
     Write-Host @"
@@ -382,8 +384,9 @@ This project supports two TTS (Text-to-Speech) options:
     Write-Host "\n>>> Installing NeuTTS Air requirements..." -ForegroundColor Yellow
     Write-Host "ℹ This will download ~1-2GB of packages and may take several minutes" -ForegroundColor Blue
     
-    # Check if CUDA is available (check both standard path and chocolatey path)
-    $hasCuda = (Test-Path "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA") -or (Test-Path "C:\ProgramData\chocolatey\lib\cuda")
+    # Use the CUDA installation status from earlier in the script
+    # Also check paths in case CUDA was already installed before running this script
+    $hasCuda = $CudaInstalled -or (Test-Path "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA") -or (Test-Path "C:\ProgramData\chocolatey\lib\cuda")
     
     try {
         if ($hasCuda) {
@@ -604,7 +607,7 @@ function Start-Installation {
     }
     
     # Install NeuTTS (optional)
-    $neuttsInstalled = Install-NeuTTS
+    $neuttsInstalled = Install-NeuTTS -CudaInstalled $cudaInstalled
     
     # Setup configuration
     $configResult = Initialize-Configuration -NeuTTSInstalled $neuttsInstalled

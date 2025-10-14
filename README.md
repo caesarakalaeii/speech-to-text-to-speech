@@ -16,8 +16,9 @@ Simple locally hosted Whisper application to generate speech transcriptions and 
 ## 📚 Tutorials
 
 **For Non-Technical Users:**
-- 🆕 [Windows Setup Guide with Local NeuTTS (FREE, Offline)](WINDOWS_NEUTTS_LOCAL_TTS_TUTORIAL.md) - Complete beginner-friendly guide for setting up local text-to-speech with voice cloning. No cloud services or fees required!
-- [Windows Setup Guide with Google Cloud TTS and Streamer Bot](WINDOWS_GOOGLE_CLOUD_TTS_STREAMER_BOT_TUTORIAL.md) - Comprehensive guide for cloud-based TTS with Streamer Bot integration.
+- 🆕 **[Windows Setup Guide](WINDOWS_SETUP.md)** - **RECOMMENDED** - Complete automated setup with one-click installation of all dependencies (Python, FFmpeg, CUDA, espeak-ng)
+- [Windows Setup Guide with Local NeuTTS (FREE, Offline)](WINDOWS_NEUTTS_LOCAL_TTS_TUTORIAL.md) - Alternative beginner-friendly guide for manual setup with local text-to-speech and voice cloning
+- [Windows Setup Guide with Google Cloud TTS and Streamer Bot](WINDOWS_GOOGLE_CLOUD_TTS_STREAMER_BOT_TUTORIAL.md) - Comprehensive guide for cloud-based TTS with Streamer Bot integration
 
 ## Requirements
 
@@ -28,33 +29,44 @@ Simple locally hosted Whisper application to generate speech transcriptions and 
 
 ## Quick Start
 
-### Method 1: Automated Setup Scripts
+> 🚀 **New!** Automated Windows installer now available! See [INSTALL_GUIDE.md](INSTALL_GUIDE.md) for all installation options.
 
-#### Windows
+### Windows (Recommended Methods)
 
-1. Clone the repository:
-```cmd
-git clone https://github.com/caesarakalaeii/speech-to-text-to-speech.git
-cd speech-to-text-to-speech
-```
+#### Method 1: Fully Automated Setup ⭐ (Easiest)
 
-2. Run the setup script:
-```cmd
-setup.bat
-```
+Automatically installs **everything** including Python, FFmpeg, CUDA, and espeak-ng:
 
-3. Configure your settings:
-   - Open `.env` in your favorite text editor
-   - Set your TTS service (speakerbot or neutts)
-   - Configure the appropriate settings for your chosen TTS service
-   - If using NeuTTS: install additional dependencies with `pip install -r requirements-neutts.txt`
+1. Clone or download this repository
+2. **Right-click `setup.bat`** → Select **"Run as Administrator"**
+3. Follow the prompts (takes 20-30 minutes)
+4. Edit `.env` file to configure
+5. Run `run.bat`
 
-4. Run the application:
-```cmd
-run.bat
-```
+📖 **Full guide:** [WINDOWS_SETUP.md](WINDOWS_SETUP.md)
 
-#### Linux/macOS
+#### Method 2: Quick Setup (If you have Python)
+
+If you already have Python 3.8+ installed:
+
+1. Clone the repository
+2. Double-click `install.bat`
+3. Edit `.env` file
+4. Run `run.bat`
+
+*Note: Requires FFmpeg and espeak-ng to be installed separately*
+
+#### Method 3: Check Your System First
+
+Not sure what you need? Run the system check:
+
+1. Double-click `check-system.bat`
+2. See what's installed and get recommendations
+3. Follow the suggested installation method
+
+### Linux/macOS
+
+#### Automated Setup Scripts (Recommended)
 
 1. Clone the repository:
 ```bash

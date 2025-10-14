@@ -3,13 +3,18 @@
 # Installation: pip install -r requirements-neutts.txt
 
 # Core NeuTTS dependencies (from neutts-air repository)
-torch>=2.0.0
+# Note: triton removed - it's Linux-only and not needed on Windows
 torchaudio>=2.0.0
-transformers>=4.30.0
-phonemizer>=3.2.1
-soundfile>=0.12.1
 einops>=0.7.0
 tqdm>=4.65.0
+librosa==0.11.0
+neucodec>=0.0.4
+numpy==2.2.6
+phonemizer==3.3.0
+soundfile==0.13.1
+torch==2.8.0
+transformers==4.56.1
+resemble-perth==1.0.1
 
 # Optional: For GGUF model support (recommended for lower latency)
 llama-cpp-python>=0.2.0
@@ -17,7 +22,6 @@ llama-cpp-python>=0.2.0
 # Optional: For ONNX decoder support (recommended for lower latency)
 onnxruntime>=1.16.0
 
-# Note: You also need to install espeak:
-# - macOS: brew install espeak
-# - Ubuntu/Debian: sudo apt install espeak
-# - Windows: Download from https://github.com/espeak-ng/espeak-ng/releases
+# Note: You also need to install espeak-ng:
+# Windows: Download from https://github.com/espeak-ng/espeak-ng/releases
+# Look for espeak-ng-X.XX-x64.msi and run the installer

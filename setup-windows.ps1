@@ -207,9 +207,21 @@ function Install-CUDA {
     
     Write-Host "✓ NVIDIA GPU detected" -ForegroundColor Green
     
-    # Check if CUDA is already installed
-    $cudaPath = "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA"
-    if ((Test-Path $cudaPath) -and -not $Force) {
+    # Check if CUDA is already installed (check both standard path and chocolatey path)
+    $cudaStandardPath = "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA"
+    $cudaChocoPath = "C:\ProgramData\chocolatey\lib\cuda"
+    $cudaInstalled = $false
+    $cudaPath = ""
+    
+    if (Test-Path $cudaStandardPath) {
+        $cudaInstalled = $true
+        $cudaPath = $cudaStandardPath
+    } elseif (Test-Path $cudaChocoPath) {
+        $cudaInstalled = $true
+        $cudaPath = $cudaChocoPath
+    }
+    
+    if ($cudaInstalled -and -not $Force) {
         Write-Host "✓ CUDA Toolkit appears to be installed at: $cudaPath" -ForegroundColor Green
         
         $install = Read-Host "Do you want to reinstall CUDA? (y/N)"

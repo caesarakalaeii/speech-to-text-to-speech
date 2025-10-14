@@ -382,8 +382,8 @@ This project supports two TTS (Text-to-Speech) options:
     Write-Host "\n>>> Installing NeuTTS Air requirements..." -ForegroundColor Yellow
     Write-Host "ℹ This will download ~1-2GB of packages and may take several minutes" -ForegroundColor Blue
     
-    # Check if CUDA is available
-    $hasCuda = Test-Path "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA"
+    # Check if CUDA is available (check both standard path and chocolatey path)
+    $hasCuda = (Test-Path "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA") -or (Test-Path "C:\ProgramData\chocolatey\lib\cuda")
     
     try {
         if ($hasCuda) {

@@ -1,0 +1,14 @@
+# Piper TTS dependencies
+# Install these if you want to use Piper TTS
+# Installation: pip install -r requirements-piper.txt
+
+# Piper TTS - Fast, local neural TTS with ONNX runtime
+# MIT licensed, runs on CPU efficiently
+piper-tts>=1.3.0
+
+# Note: Piper uses pre-trained ONNX voice models
+# Download voices from: https://huggingface.co/rhasspy/piper-voices
+#
+# Voice cloning requires training custom models (not covered by this package)
+# See: https://github.com/rhasspy/piper for training instructions
+# Or use: https://github.com/binxio/piper-voice-cloning for helper scripts

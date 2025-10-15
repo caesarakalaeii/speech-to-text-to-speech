@@ -2,18 +2,23 @@
 # Install these if you want to use NeuTTS Air instead of Speakerbot
 # Installation: pip install -r requirements-neutts.txt
 
+# PyTorch (install BEFORE this file for proper CUDA/CPU selection)
+# IMPORTANT: Install PyTorch 2.4.1 first using ONE of these commands:
+#   CPU: pip install torch==2.4.1 torchaudio==2.4.1 --index-url https://download.pytorch.org/whl/cpu
+#   CUDA 12.1: pip install torch==2.4.1 torchaudio==2.4.1 --index-url https://download.pytorch.org/whl/cu121
+# Then install this requirements file: pip install -r requirements-neutts.txt
+
 # Core NeuTTS dependencies (from neutts-air repository)
-# Note: triton removed - it's Linux-only and not needed on Windows
-torchaudio>=2.0.0
+# Note: NumPy 1.x required for compatibility with PyTorch 2.4.1
+# triton removed - it's Linux-only and not needed on Windows
 einops>=0.7.0
 tqdm>=4.65.0
 librosa==0.11.0
-neucodec>=0.0.4
-numpy==2.2.6
+neucodec==0.0.3
+numpy>=1.24.0,<2.0.0
 phonemizer==3.3.0
 soundfile==0.13.1
-torch==2.8.0
-transformers==4.56.1
+transformers==4.44.2
 resemble-perth==1.0.1
 
 # Optional: For GGUF model support (recommended for lower latency)
@@ -22,6 +27,9 @@ llama-cpp-python>=0.2.0
 # Optional: For ONNX decoder support (recommended for lower latency)
 onnxruntime>=1.16.0
 
-# Note: You also need to install espeak-ng:
+# System Dependency (must be installed separately):
+# espeak-ng is REQUIRED for phonemization
 # Windows: Download from https://github.com/espeak-ng/espeak-ng/releases
-# Look for espeak-ng-X.XX-x64.msi and run the installer
+#   Look for espeak-ng-X.XX-x64.msi and run the installer
+# Linux: sudo apt-get install espeak-ng
+# macOS: brew install espeak-ng

@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 """
 Automated Installation Script for speech-to-text-to-speech
-Handles dependency installation and NeuTTS setup across platforms
+Handles dependency installation and TTS service setup across platforms
 
 This script will:
 1. Check system dependencies (Python, FFmpeg, PortAudio)
 2. Create a virtual environment
 3. Install base requirements (Whisper, PyAudio, etc.)
-4. Optionally install NeuTTS Air dependencies for local TTS
-5. Set up environment configuration
+4. Let you choose TTS service: Speakerbot, Piper, StyleTTS2, or NeuTTS Air
+5. Install TTS-specific dependencies
+6. Set up environment configuration
 """
 
 import os
@@ -231,38 +232,52 @@ def install_base_requirements():
         return response == 'y'
 
 
-def ask_neutts():
-    """Ask user if they want to install NeuTTS"""
-    print_header("NeuTTS Air - Local Neural TTS with Voice Cloning")
-    
-    print("This project supports two TTS (Text-to-Speech) options:")
+def ask_tts_service():
+    """Ask user which TTS service they want to install"""
+    print_header("TTS (Text-to-Speech) Service Selection")
+
+    print("This project supports multiple TTS options:")
     print("")
-    print("1. Speakerbot (default):")
-    print("   • Uses external WebSocket TTS service")
-    print("   • Requires Speakerbot or compatible service running separately")
-    print("   • Lightweight, no additional dependencies")
+    print("1. Speakerbot (default - no installation needed):")
+    print("   • External WebSocket TTS service")
+    print("   • Requires Speakerbot running separately")
+    print("   • Zero local dependencies")
+    print("   • Network dependent")
     print("")
-    print("2. NeuTTS Air (optional):")
-    print("   • Completely offline, local neural TTS engine")
-    print("   • Instant voice cloning from short audio samples (3-15 seconds)")
-    print("   • High-quality speech synthesis")
-    print("   • No API calls, subscription fees, or usage limits")
-    print("   • Requires ~2-4GB additional disk space")
-    print("   • Requires espeak-ng system dependency")
-    print("   • May require GPU for best performance (CPU works but slower)")
+    print("2. Piper (simplest local option):")
+    print("   • Fast local TTS with ONNX")
+    print("   • Pre-trained voices only (no voice cloning)")
+    print("   • Very lightweight (~100MB)")
+    print("   • Runs fast on CPU")
+    print("   • MIT licensed")
     print("")
-    
+    print("3. StyleTTS2 (modern voice cloning):")
+    print("   • Local neural TTS with voice cloning")
+    print("   • Clone voice from 3-15 second samples")
+    print("   • Simpler than NeuTTS (no espeak-ng needed)")
+    print("   • Requires PyTorch (~1-2GB)")
+    print("   • MIT licensed")
+    print("")
+    print("4. NeuTTS Air (advanced voice cloning):")
+    print("   • High-quality voice cloning")
+    print("   • Most features, most complex")
+    print("   • Requires PyTorch + espeak-ng (~2-4GB)")
+    print("   • Best with GPU")
+    print("")
+
     while True:
-        response = input("Do you want to install NeuTTS Air dependencies? (y/n): ").strip().lower()
-        if response in ['y', 'n', 'yes', 'no']:
-            return response in ['y', 'yes']
-        print("Please enter 'y' or 'n'")
+        print("Which TTS service would you like to install?")
+        response = input("Enter 1 (Speakerbot), 2 (Piper), 3 (StyleTTS2), or 4 (NeuTTS): ").strip()
+        if response in ['1', '2', '3', '4']:
+            return response
+        print("Please enter 1, 2, 3, or 4")
 
 
 def install_neutts_requirements():
     """Install NeuTTS requirements"""
     print_step("Installing NeuTTS Air requirements...")
     pip_path = get_venv_pip()
+    python_path = get_venv_python()
     
     print("This will install:")
     print("  - PyTorch (deep learning framework)")
@@ -273,41 +288,77 @@ def install_neutts_requirements():
     print("\nThis may take several minutes and download ~1-2GB of packages.")
     print("")
     
-    # On Windows, suggest PyTorch installation first
+    # Check if CUDA is available
     system = platform.system()
+    cuda_available = False
+    
     if system == "Windows":
-        print("⚠ For Windows users:")
-        print("If you have an NVIDIA GPU and want to use CUDA acceleration,")
-        print("PyTorch with CUDA support will be installed.")
-        print("\nIf you ran setup.bat and CUDA was installed, we'll use GPU support.")
-        print("Otherwise, we'll install CPU-only PyTorch.")
+        cuda_available = os.path.exists("C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA") or \
+                        os.path.exists("C:\\ProgramData\\chocolatey\\lib\\cuda")
+    
+    # Install PyTorch first with proper error handling
+    torch_installed = False
+    
+    if cuda_available:
+        print("✓ CUDA detected - installing PyTorch with GPU support")
+        print("  Using CUDA 12.1 index: https://download.pytorch.org/whl/cu121")
         print("")
         
-        # Check if CUDA is available
-        cuda_available = os.path.exists("C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA")
+        success, stdout, stderr = run_command(
+            f'"{pip_path}" install torch==2.4.1 torchaudio==2.4.1 --index-url https://download.pytorch.org/whl/cu121',
+            check=False
+        )
         
-        if cuda_available:
-            print("✓ CUDA detected - will install PyTorch with GPU support")
-            # Install PyTorch with CUDA support first
-            print("\nInstalling PyTorch with CUDA 12.1 support...")
-            success, _, stderr = run_command(
-                f'"{pip_path}" install torch torchaudio --index-url https://download.pytorch.org/whl/cu121',
-                check=False
-            )
-            if not success:
-                print("⚠ Failed to install PyTorch with CUDA, trying CPU version...")
-                run_command(
-                    f'"{pip_path}" install torch torchaudio --index-url https://download.pytorch.org/whl/cpu',
-                    check=False
-                )
+        if success:
+            print("✓ PyTorch with CUDA support installed successfully")
+            torch_installed = True
         else:
-            print("ℹ No CUDA detected - will install CPU-only PyTorch")
-            print("\nInstalling PyTorch (CPU version)...")
-            run_command(
-                f'"{pip_path}" install torch torchaudio --index-url https://download.pytorch.org/whl/cpu',
-                check=False
-            )
+            print("⚠ Failed to install PyTorch with CUDA support")
+            print(f"  Error: {stderr[:200]}")
+            print("  Falling back to CPU version...")
     
+    if not torch_installed:
+        print("ℹ Installing PyTorch (CPU version)")
+        print("  Using CPU index: https://download.pytorch.org/whl/cpu")
+        print("")
+        
+        success, stdout, stderr = run_command(
+            f'"{pip_path}" install torch==2.4.1 torchaudio==2.4.1 --index-url https://download.pytorch.org/whl/cpu',
+            check=False
+        )
+        
+        if not success:
+            print("✗ Failed to install PyTorch (CPU version)")
+            print(f"  Error: {stderr[:200]}")
+            print("\nYou may need to install PyTorch manually:")
+            print("Visit: https://pytorch.org/get-started/locally/")
+            print("\nFor CPU-only (no GPU):")
+            print(f'  "{pip_path}" install torch torchaudio --index-url https://download.pytorch.org/whl/cpu')
+            print("\nFor NVIDIA GPU (CUDA 12.1):")
+            print(f'  "{pip_path}" install torch torchaudio --index-url https://download.pytorch.org/whl/cu121')
+            response = input("\nContinue with remaining packages? (y/n): ").strip().lower()
+            if response != 'y':
+                return False
+        else:
+            print("✓ PyTorch (CPU version) installed successfully")
+            torch_installed = True
+    
+    # Verify PyTorch installation
+    if torch_installed:
+        print("\nℹ Verifying PyTorch installation...")
+        success, stdout, stderr = run_command(
+            f'"{python_path}" -c "import torch; print(f\'PyTorch {{torch.__version__}}\'); print(f\'CUDA available: {{torch.cuda.is_available()}}\')"',
+            check=False
+        )
+        if success:
+            print("✓ PyTorch verification:")
+            for line in stdout.strip().split('\n'):
+                print(f"  {line}")
+        else:
+            print("⚠ Could not verify PyTorch installation")
+    
+    # Install remaining NeuTTS dependencies
+    print("\nℹ Installing remaining NeuTTS dependencies...")
     success, stdout, stderr = run_command(f'"{pip_path}" install -r requirements-neutts.txt', check=False)
     
     if success:
@@ -315,12 +366,6 @@ def install_neutts_requirements():
     else:
         print("⚠ Some NeuTTS packages may have failed to install")
         print(f"\nError details:\n{stderr[:500]}")
-        print("\nYou may need to install PyTorch separately for your system:")
-        print("Visit: https://pytorch.org/get-started/locally/")
-        print("\nFor CPU-only (no GPU):")
-        print(f'  "{pip_path}" install torch torchaudio --index-url https://download.pytorch.org/whl/cpu')
-        print("\nFor NVIDIA GPU (CUDA 12.1):")
-        print(f'  "{pip_path}" install torch torchaudio --index-url https://download.pytorch.org/whl/cu121')
     
     # Check for espeak-ng
     print_step("Checking for espeak-ng (required for NeuTTS)...")
@@ -366,60 +411,193 @@ def install_neutts_requirements():
     return True
 
 
-def setup_env_file(neutts_installed):
+def install_piper_requirements():
+    """Install Piper TTS requirements"""
+    print_step("Installing Piper TTS requirements...")
+    pip_path = get_venv_pip()
+
+    print("This will install:")
+    print("  - piper-tts (fast local TTS)")
+    print("\nThis is very lightweight, only ~20MB")
+    print("")
+
+    success, stdout, stderr = run_command(f'"{pip_path}" install -r requirements-piper.txt', check=False)
+
+    if success:
+        print("✓ Piper TTS requirements installed successfully")
+        print("\n📝 NOTE: You need to download voice models separately:")
+        print("   Download from: https://huggingface.co/rhasspy/piper-voices")
+        print("   Set PIPER_VOICE_PATH in .env to the .onnx file path")
+        return True
+    else:
+        print("⚠ Piper TTS installation failed")
+        print(f"\nError details:\n{stderr[:500]}")
+        response = input("\nContinue anyway? (y/n): ").strip().lower()
+        return response == 'y'
+
+
+def install_styletts2_requirements():
+    """Install StyleTTS2 requirements"""
+    print_step("Installing StyleTTS2 requirements...")
+    pip_path = get_venv_pip()
+    python_path = get_venv_python()
+
+    print("This will install:")
+    print("  - PyTorch (deep learning framework)")
+    print("  - StyleTTS2 (neural TTS with voice cloning)")
+    print("\nThis may take several minutes and download ~1-2GB of packages.")
+    print("")
+
+    # Check if CUDA is available
+    system = platform.system()
+    cuda_available = False
+
+    if system == "Windows":
+        cuda_available = os.path.exists("C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA") or \
+                        os.path.exists("C:\\ProgramData\\chocolatey\\lib\\cuda")
+
+    # Install PyTorch first
+    torch_installed = False
+
+    if cuda_available:
+        print("✓ CUDA detected - installing PyTorch 2.4.1 with GPU support")
+        print("  Using CUDA 12.1 index: https://download.pytorch.org/whl/cu121")
+        print("")
+
+        success, stdout, stderr = run_command(
+            f'"{pip_path}" install torch==2.4.1 torchaudio==2.4.1 --index-url https://download.pytorch.org/whl/cu121',
+            check=False
+        )
+
+        if success:
+            print("✓ PyTorch with CUDA support installed successfully")
+            torch_installed = True
+        else:
+            print("⚠ Failed to install PyTorch with CUDA support")
+            print(f"  Error: {stderr[:200]}")
+            print("  Falling back to CPU version...")
+
+    if not torch_installed:
+        print("ℹ Installing PyTorch 2.4.1 (CPU version)")
+        print("  Using CPU index: https://download.pytorch.org/whl/cpu")
+        print("")
+
+        success, stdout, stderr = run_command(
+            f'"{pip_path}" install torch==2.4.1 torchaudio==2.4.1 --index-url https://download.pytorch.org/whl/cpu',
+            check=False
+        )
+
+        if not success:
+            print("✗ Failed to install PyTorch (CPU version)")
+            print(f"  Error: {stderr[:200]}")
+            response = input("\nContinue with remaining packages? (y/n): ").strip().lower()
+            if response != 'y':
+                return False
+        else:
+            print("✓ PyTorch 2.4.1 (CPU version) installed successfully")
+            torch_installed = True
+
+    # Verify PyTorch installation
+    if torch_installed:
+        print("\nℹ Verifying PyTorch installation...")
+        success, stdout, stderr = run_command(
+            f'"{python_path}" -c "import torch; print(f\'PyTorch {{torch.__version__}}\'); print(f\'CUDA available: {{torch.cuda.is_available()}}\')"',
+            check=False
+        )
+        if success:
+            print("✓ PyTorch verification:")
+            for line in stdout.strip().split('\n'):
+                print(f"  {line}")
+        else:
+            print("⚠ Could not verify PyTorch installation")
+
+    # Install StyleTTS2
+    print("\nℹ Installing StyleTTS2...")
+    success, stdout, stderr = run_command(f'"{pip_path}" install -r requirements-styletts2.txt', check=False)
+
+    if success:
+        print("✓ StyleTTS2 requirements installed successfully")
+        print("\n📝 NOTE: On first run, StyleTTS2 will download model files (~500MB-1GB)")
+        print("   This is a one-time download from HuggingFace")
+        return True
+    else:
+        print("⚠ Some StyleTTS2 packages may have failed to install")
+        print(f"\nError details:\n{stderr[:500]}")
+        response = input("\nContinue anyway? (y/n): ").strip().lower()
+        return response == 'y'
+
+
+def setup_env_file(tts_choice):
     """Set up .env file from .env.example"""
     print_step("Setting up environment configuration...")
-    
+
     env_exists = os.path.exists(".env")
-    
+
+    # Map choice to service name
+    tts_service_map = {
+        '1': 'speakerbot',
+        '2': 'piper',
+        '3': 'styletts2',
+        '4': 'neutts'
+    }
+    tts_service = tts_service_map.get(tts_choice, 'speakerbot')
+
     if env_exists:
         print("✓ .env file already exists")
         overwrite = input("Overwrite existing .env file with defaults? (y/n): ").strip().lower()
         if overwrite not in ['y', 'yes']:
             print("Keeping existing .env file")
             return True
-    
+
     if os.path.exists(".env.example"):
         shutil.copy(".env.example", ".env")
         print("✓ .env file created from .env.example")
-        
+
         # Update TTS_SERVICE based on installation choice
-        if neutts_installed:
-            try:
-                with open(".env", "r") as f:
-                    content = f.read()
-                content = content.replace("TTS_SERVICE=speakerbot", "TTS_SERVICE=neutts")
-                with open(".env", "w") as f:
-                    f.write(content)
-                print("✓ Set TTS_SERVICE=neutts in .env")
-            except Exception as e:
-                print(f"⚠ Could not update .env automatically: {e}")
-        
+        try:
+            with open(".env", "r") as f:
+                content = f.read()
+            content = content.replace("TTS_SERVICE=speakerbot", f"TTS_SERVICE={tts_service}")
+            with open(".env", "w") as f:
+                f.write(content)
+            print(f"✓ Set TTS_SERVICE={tts_service} in .env")
+        except Exception as e:
+            print(f"⚠ Could not update .env automatically: {e}")
+
         print("\n📝 Configuration file created!")
         print("   Location: .env")
         print("\n⚠ You may need to edit .env for your setup:")
-        
-        if neutts_installed:
+
+        if tts_service == 'neutts':
             print("   - NEUTTS_REF_AUDIO: path to your reference audio (3-15 sec, .wav)")
             print("   - NEUTTS_REF_TEXT: path to transcription of reference audio")
             print("   - NEUTTS_BACKBONE_DEVICE: 'cuda' for GPU or 'cpu' for CPU")
-        else:
+        elif tts_service == 'piper':
+            print("   - PIPER_VOICE_PATH: path to .onnx voice model file")
+            print("   - Download voices from: https://huggingface.co/rhasspy/piper-voices")
+        elif tts_service == 'styletts2':
+            print("   - STYLETTS2_REF_AUDIO: path to reference audio for voice cloning")
+            print("   - Leave empty to use default voice")
+        else:  # speakerbot
             print("   - SPEAKERBOT_WEBSOCKET_URL: your Speakerbot WebSocket URL")
             print("   - VOICE_NAME: the voice to use in Speakerbot")
-        
+
         print("   - WHISPER_MODEL: tiny/base/small/medium/large (larger = more accurate but slower)")
-        
+
         return True
     else:
         print("⚠ .env.example not found, creating basic .env...")
         try:
             with open(".env", "w") as f:
-                tts_service = "neutts" if neutts_installed else "speakerbot"
                 f.write(f"TTS_SERVICE={tts_service}\n")
                 f.write("WHISPER_MODEL=base\n")
-                if neutts_installed:
+                if tts_service == 'neutts':
                     f.write("NEUTTS_BACKBONE=neuphonic/neutts-air-q4-gguf\n")
                     f.write("NEUTTS_BACKBONE_DEVICE=cpu\n")
+                elif tts_service == 'piper':
+                    f.write("PIPER_VOICE_PATH=\n")
+                elif tts_service == 'styletts2':
+                    f.write("STYLETTS2_REF_AUDIO=\n")
                 else:
                     f.write("SPEAKERBOT_WEBSOCKET_URL=ws://localhost:8080\n")
             print("✓ Basic .env file created")
@@ -429,40 +607,58 @@ def setup_env_file(neutts_installed):
             return False
 
 
-def print_next_steps(neutts_installed):
+def print_next_steps(tts_choice):
     """Print next steps for the user"""
     print_header("Installation Complete!")
-    
+
     system = platform.system()
-    
+    tts_service_map = {
+        '1': 'speakerbot',
+        '2': 'piper',
+        '3': 'styletts2',
+        '4': 'neutts'
+    }
+    tts_service = tts_service_map.get(tts_choice, 'speakerbot')
+
     print("🎉 Installation finished successfully!")
     print("\n" + "─" * 70)
     print("NEXT STEPS:")
     print("─" * 70)
-    
+
     print("\n1️⃣  Activate the virtual environment:")
     if system == "Windows":
         print("   venv\\Scripts\\activate")
         print("   (or venv\\Scripts\\activate.bat in Command Prompt)")
     else:
         print("   source venv/bin/activate")
-    
+
     print("\n2️⃣  Review and edit configuration file:")
     print("   Edit the .env file to configure:")
-    
-    if neutts_installed:
+
+    if tts_service == 'neutts':
         print("\n   For NeuTTS Air:")
-        print("   - TTS_SERVICE=neutts (already set)")
+        print(f"   - TTS_SERVICE={tts_service} (already set)")
         print("   - NEUTTS_REF_AUDIO=path to reference audio (3-15 sec .wav file)")
         print("   - NEUTTS_REF_TEXT=path to transcription text file")
         print("   - NEUTTS_BACKBONE_DEVICE=cuda (if you have GPU) or cpu")
         print("\n   Sample files are available in the 'samples/' directory")
-    else:
+    elif tts_service == 'piper':
+        print("\n   For Piper TTS:")
+        print(f"   - TTS_SERVICE={tts_service} (already set)")
+        print("   - PIPER_VOICE_PATH=path/to/voice.onnx")
+        print("   - Download voices from: https://huggingface.co/rhasspy/piper-voices")
+        print("   - You need both .onnx and .onnx.json files")
+    elif tts_service == 'styletts2':
+        print("\n   For StyleTTS2:")
+        print(f"   - TTS_SERVICE={tts_service} (already set)")
+        print("   - STYLETTS2_REF_AUDIO=path to reference audio (for voice cloning)")
+        print("   - Leave empty to use default voice")
+    else:  # speakerbot
         print("\n   For Speakerbot:")
-        print("   - TTS_SERVICE=speakerbot (already set)")
+        print(f"   - TTS_SERVICE={tts_service} (already set)")
         print("   - SPEAKERBOT_WEBSOCKET_URL=ws://localhost:8080")
         print("   - VOICE_NAME=your preferred voice")
-    
+
     print("\n   For Whisper (speech recognition):")
     print("   - WHISPER_MODEL=base (or tiny/small/medium/large)")
     print("     • tiny:   fastest, least accurate (~1GB RAM)")
@@ -470,26 +666,25 @@ def print_next_steps(neutts_installed):
     print("     • small:  good quality (~2GB RAM)")
     print("     • medium: better quality (~5GB RAM)")
     print("     • large:  best quality, slowest (~10GB RAM)")
-    
+
     print("\n3️⃣  Run the application:")
     if system == "Windows":
         print("   run.bat")
     else:
         print("   ./run.sh")
         print("   (or: python main.py)")
-    
-    if neutts_installed:
-        print("\n📝 NOTE: On first run, NeuTTS will download model files (~1-2GB).")
+
+    if tts_service in ['neutts', 'styletts2']:
+        print(f"\n📝 NOTE: On first run, {tts_service.upper()} will download model files.")
         print("   This is a one-time download and may take several minutes.")
-    
+
     print("\n" + "─" * 70)
     print("📚 For more information:")
     print("   - README.md - General documentation")
     print("   - .env.example - Configuration options")
-    if neutts_installed:
-        print("   - neuttsair/ - NeuTTS Air module")
+    print("   - CLAUDE.md - TTS comparison and troubleshooting")
     print("─" * 70 + "\n")
-    
+
     print("Need help? Check the README or open an issue on GitHub!")
     print("")
 
@@ -533,23 +728,33 @@ def main():
         response = input("Continue anyway? (y/n): ").strip().lower()
         if response != 'y':
             sys.exit(1)
-    
-    # Ask about NeuTTS
-    neutts_installed = False
-    if ask_neutts():
-        if install_neutts_requirements():
-            neutts_installed = True
-        else:
-            print("\n⚠ NeuTTS installation encountered issues.")
-            print("You can still use Speakerbot for TTS.")
-    else:
-        print("\n✓ Skipping NeuTTS installation - will use Speakerbot")
-    
+
+    # Ask about TTS service
+    tts_choice = ask_tts_service()
+
+    # Install TTS-specific dependencies
+    tts_installed = True
+    if tts_choice == '1':
+        print("\n✓ Speakerbot selected - no additional dependencies needed")
+    elif tts_choice == '2':
+        print("\n✓ Installing Piper TTS...")
+        tts_installed = install_piper_requirements()
+    elif tts_choice == '3':
+        print("\n✓ Installing StyleTTS2...")
+        tts_installed = install_styletts2_requirements()
+    elif tts_choice == '4':
+        print("\n✓ Installing NeuTTS Air...")
+        tts_installed = install_neutts_requirements()
+
+    if not tts_installed:
+        print("\n⚠ TTS installation encountered issues.")
+        print("You can reconfigure later by editing .env")
+
     # Setup .env file
-    setup_env_file(neutts_installed)
-    
+    setup_env_file(tts_choice)
+
     # Print next steps
-    print_next_steps(neutts_installed)
+    print_next_steps(tts_choice)
 
 
 if __name__ == "__main__":

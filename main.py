@@ -25,14 +25,26 @@ load_dotenv()
 
 # Configuration
 TTS_SERVICE = os.getenv("TTS_SERVICE", "speakerbot").lower()
+
+# Speakerbot settings
 WEBSOCKET_URL = os.getenv("SPEAKERBOT_WEBSOCKET_URL", "ws://localhost:7585/speak")
 VOICE_NAME = os.getenv("VOICE_NAME", "Sally")
+
+# NeuTTS Air settings
 NEUTTS_BACKBONE = os.getenv("NEUTTS_BACKBONE", "neuphonic/neutts-air-q4-gguf")
 NEUTTS_BACKBONE_DEVICE = os.getenv("NEUTTS_BACKBONE_DEVICE", "cpu")
 NEUTTS_CODEC = os.getenv("NEUTTS_CODEC", "neuphonic/neucodec")
 NEUTTS_CODEC_DEVICE = os.getenv("NEUTTS_CODEC_DEVICE", "cpu")
 NEUTTS_REF_AUDIO = os.getenv("NEUTTS_REF_AUDIO", "")
 NEUTTS_REF_TEXT = os.getenv("NEUTTS_REF_TEXT", "")
+
+# Piper TTS settings
+PIPER_VOICE_PATH = os.getenv("PIPER_VOICE_PATH", "")
+
+# StyleTTS2 settings
+STYLETTS2_REF_AUDIO = os.getenv("STYLETTS2_REF_AUDIO", "")
+
+# Whisper and audio settings
 WHISPER_MODEL = os.getenv("WHISPER_MODEL", "base")
 SAMPLE_RATE = int(os.getenv("SAMPLE_RATE", "16000"))
 CHUNK_DURATION = float(os.getenv("CHUNK_DURATION", "3.0"))
@@ -70,68 +82,130 @@ def list_output_devices():
     return devices
 
 
-class MicrophoneSelector:
-    def __init__(self):
-        self.selected_index = None
+class AudioDeviceSelector:
+    """Unified GUI for selecting both input and output audio devices"""
+
+    def __init__(self, need_output=False):
+        self.input_device_index = None
+        self.output_device_index = None
+        self.need_output = need_output
+
         self.root = tk.Tk()
-        self.root.title('Select Microphone')
-        self.devices = list_microphones()
-        if not self.devices:
+        self.root.title('Audio Device Setup - Speech-to-Text-to-Speech')
+        self.root.geometry('500x250')
+        self.root.resizable(False, False)
+
+        # Get devices
+        self.input_devices = list_microphones()
+        self.output_devices = list_output_devices() if need_output else []
+
+        # Check for errors
+        if not self.input_devices:
             messagebox.showerror('Error', 'No microphone devices found!')
             self.root.destroy()
             return
-        tk.Label(self.root, text='Choose a microphone:').pack(padx=10, pady=10)
-        self.combo = ttk.Combobox(self.root, values=[name for idx, name in self.devices], state='readonly')
-        self.combo.pack(padx=10, pady=10)
-        self.combo.current(0)
-        tk.Button(self.root, text='Select', command=self.select).pack(pady=10)
-        self.root.protocol('WM_DELETE_WINDOW', self.on_close)
 
-    def select(self):
-        idx = self.combo.current()
-        self.selected_index = self.devices[idx][0]
-        self.root.quit()
-
-    def on_close(self):
-        self.selected_index = None
-        self.root.quit()
-
-    def show(self):
-        self.root.mainloop()
-        return self.selected_index
-
-
-class OutputDeviceSelector:
-    """GUI for selecting audio output device"""
-    
-    def __init__(self):
-        self.selected_index = None
-        self.root = tk.Tk()
-        self.root.title('Select Output Device')
-        self.devices = list_output_devices()
-        if not self.devices:
+        if need_output and not self.output_devices:
             messagebox.showerror('Error', 'No output devices found!')
             self.root.destroy()
             return
-        tk.Label(self.root, text='Choose an output device:').pack(padx=10, pady=10)
-        self.combo = ttk.Combobox(self.root, values=[name for idx, name in self.devices], state='readonly')
-        self.combo.pack(padx=10, pady=10)
-        self.combo.current(0)
-        tk.Button(self.root, text='Select', command=self.select).pack(pady=10)
-        self.root.protocol('WM_DELETE_WINDOW', self.on_close)
 
-    def select(self):
-        idx = self.combo.current()
-        self.selected_index = self.devices[idx][0]
-        self.root.quit()
+        # Create UI
+        self._create_ui()
 
-    def on_close(self):
-        self.selected_index = None
+        # Center window
+        self.root.update_idletasks()
+        x = (self.root.winfo_screenwidth() // 2) - (self.root.winfo_width() // 2)
+        y = (self.root.winfo_screenheight() // 2) - (self.root.winfo_height() // 2)
+        self.root.geometry(f'+{x}+{y}')
+
+    def _create_ui(self):
+        """Create the UI elements"""
+        # Main frame with padding
+        main_frame = tk.Frame(self.root, padx=20, pady=20)
+        main_frame.pack(fill=tk.BOTH, expand=True)
+
+        # Input device section
+        input_label = tk.Label(main_frame, text='Microphone (Input):', font=('Arial', 10, 'bold'))
+        input_label.pack(anchor=tk.W, pady=(0, 5))
+
+        self.input_combo = ttk.Combobox(
+            main_frame,
+            values=[name for idx, name in self.input_devices],
+            state='readonly',
+            width=60
+        )
+        self.input_combo.pack(fill=tk.X, pady=(0, 15))
+        self.input_combo.current(0)
+
+        # Output device section (if needed)
+        if self.need_output:
+            output_label = tk.Label(main_frame, text='Speaker (Output):', font=('Arial', 10, 'bold'))
+            output_label.pack(anchor=tk.W, pady=(0, 5))
+
+            self.output_combo = ttk.Combobox(
+                main_frame,
+                values=[name for idx, name in self.output_devices],
+                state='readonly',
+                width=60
+            )
+            self.output_combo.pack(fill=tk.X, pady=(0, 15))
+            self.output_combo.current(0)
+
+        # Button frame
+        button_frame = tk.Frame(main_frame)
+        button_frame.pack(pady=(10, 0))
+
+        # Start button
+        start_btn = tk.Button(
+            button_frame,
+            text='Start',
+            command=self._on_start,
+            width=15,
+            bg='#4CAF50',
+            fg='white',
+            font=('Arial', 10, 'bold'),
+            cursor='hand2'
+        )
+        start_btn.pack(side=tk.LEFT, padx=5)
+
+        # Cancel button
+        cancel_btn = tk.Button(
+            button_frame,
+            text='Cancel',
+            command=self._on_cancel,
+            width=15,
+            font=('Arial', 10),
+            cursor='hand2'
+        )
+        cancel_btn.pack(side=tk.LEFT, padx=5)
+
+        # Set protocol for window close
+        self.root.protocol('WM_DELETE_WINDOW', self._on_cancel)
+
+    def _on_start(self):
+        """Handle start button click"""
+        idx = self.input_combo.current()
+        self.input_device_index = self.input_devices[idx][0]
+
+        if self.need_output:
+            idx = self.output_combo.current()
+            self.output_device_index = self.output_devices[idx][0]
+
         self.root.quit()
+        self.root.destroy()
+
+    def _on_cancel(self):
+        """Handle cancel button click"""
+        self.input_device_index = None
+        self.output_device_index = None
+        self.root.quit()
+        self.root.destroy()
 
     def show(self):
+        """Show the dialog and return selected devices"""
         self.root.mainloop()
-        return self.selected_index
+        return self.input_device_index, self.output_device_index
 
 
 class AudioPlayer:
@@ -277,12 +351,18 @@ class AudioRecorder:
 
 class WhisperTranscriber:
     """Transcribes audio using Whisper"""
-    
+
+    # Common Whisper hallucinations on silence/noise
+    HALLUCINATION_PHRASES = {
+        "thank you.", "thank you", "thanks for watching", "thanks for watching!",
+        "bye.", "bye", "goodbye", "you", ".", ""
+    }
+
     def __init__(self, model_name=WHISPER_MODEL):
         logger.info(f"Loading Whisper model '{model_name}'...")
         self.model = whisper.load_model(model_name)
         logger.info("Whisper model loaded successfully")
-        
+
     def transcribe(self, audio_data):
         """Transcribe audio data"""
         try:
@@ -293,7 +373,29 @@ class WhisperTranscriber:
                 fp16=False
             )
             text = result["text"].strip()
-            return text if text else None
+
+            # Filter out empty transcriptions
+            if not text:
+                return None
+
+            # Filter out common hallucinations
+            if text.lower() in self.HALLUCINATION_PHRASES:
+                logger.debug(f"Filtered hallucination: '{text}'")
+                return None
+
+            # Check no_speech_prob to detect silence
+            # Higher values (>0.6) indicate likely silence/hallucination
+            avg_no_speech_prob = sum(
+                segment.get("no_speech_prob", 0)
+                for segment in result.get("segments", [])
+            ) / max(len(result.get("segments", [])), 1)
+
+            if avg_no_speech_prob > 0.6:
+                logger.debug(f"Filtered low-confidence transcription (no_speech_prob={avg_no_speech_prob:.2f}): '{text}'")
+                return None
+
+            return text
+
         except Exception as e:
             logger.error(f"Error transcribing audio: {e}")
             return None
@@ -369,33 +471,36 @@ class NeuTTSClient:
             # Import here to avoid requiring it if not used
             from neuttsair.neutts import NeuTTSAir
             import soundfile as sf
-            
+
             if not self.ref_audio or not os.path.exists(self.ref_audio):
                 logger.error(f"Reference audio file not found: {self.ref_audio}")
                 self.connected = False
                 return
-            
+
             if not self.ref_text or not os.path.exists(self.ref_text):
                 logger.error(f"Reference text file not found: {self.ref_text}")
                 self.connected = False
                 return
-            
+
             logger.info(f"Loading NeuTTS Air model (backbone: {self.backbone})...")
+            logger.info("Note: On first run, NeuTTS will automatically download model files from HuggingFace")
+            logger.info("This is a one-time download (~1-2GB) and may take several minutes")
+
             self.tts = NeuTTSAir(
                 backbone_repo=self.backbone,
                 backbone_device=self.backbone_device,
                 codec_repo=self.codec,
                 codec_device=self.codec_device
             )
-            
+
             # Load and encode reference audio
             logger.info(f"Encoding reference audio from {self.ref_audio}...")
             self.ref_codes = self.tts.encode_reference(self.ref_audio)
-            
+
             # Load reference text
             with open(self.ref_text, 'r') as f:
                 self.ref_text_content = f.read().strip()
-            
+
             self.connected = True
             logger.info("NeuTTS Air model loaded successfully")
         except ImportError as e:
@@ -437,11 +542,284 @@ class NeuTTSClient:
         logger.info("Closed NeuTTS client")
 
 
+class PiperClient:
+    """Local Piper TTS client"""
+
+    def __init__(self, voice_path=PIPER_VOICE_PATH, audio_player=None):
+        self.voice_path = voice_path
+        self.tts = None
+        self.connected = False
+        self.audio_player = audio_player
+        self.default_voice = "en_US-amy-medium"
+
+    async def _download_voice_model(self, voice_name):
+        """Download a Piper voice model from HuggingFace"""
+        try:
+            import urllib.request
+            import json
+
+            # Create voices directory if it doesn't exist
+            voices_dir = os.path.join(os.path.dirname(__file__), "voices")
+            os.makedirs(voices_dir, exist_ok=True)
+
+            # Parse voice name (format: en_US-amy-medium)
+            # HuggingFace structure: en/en_US/amy/medium/en_US-amy-medium.onnx
+            parts = voice_name.split('-')
+            if len(parts) < 2:
+                logger.error(f"Invalid voice name format: {voice_name}")
+                return None
+
+            # Extract language_country (e.g., en_US)
+            lang_country = parts[0]
+            # Extract language (e.g., en)
+            lang = lang_country.split('_')[0]
+
+            # Rest is voice name and quality (e.g., amy-medium)
+            voice_parts = parts[1:]
+            if len(voice_parts) < 2:
+                logger.error(f"Invalid voice name format: {voice_name} (need name and quality)")
+                return None
+
+            voice_speaker = voice_parts[0]  # amy
+            voice_quality = voice_parts[1]  # medium
+
+            # Construct HuggingFace URL path
+            # Format: en/en_US/amy/medium/en_US-amy-medium.onnx
+            hf_path = f"{lang}/{lang_country}/{voice_speaker}/{voice_quality}/{voice_name}"
+
+            base_url = f"https://huggingface.co/rhasspy/piper-voices/resolve/main/{hf_path}"
+            onnx_url = f"{base_url}.onnx"
+            json_url = f"{base_url}.onnx.json"
+
+            onnx_path = os.path.join(voices_dir, f"{voice_name}.onnx")
+            json_path = os.path.join(voices_dir, f"{voice_name}.onnx.json")
+
+            logger.info(f"Downloading Piper voice model '{voice_name}'...")
+            logger.info("This is a one-time download (~20-50MB)")
+
+            # Download .onnx file
+            logger.info(f"Downloading {onnx_url}...")
+            urllib.request.urlretrieve(onnx_url, onnx_path)
+            logger.info(f"Downloaded {onnx_path}")
+
+            # Download .onnx.json file
+            logger.info(f"Downloading {json_url}...")
+            urllib.request.urlretrieve(json_url, json_path)
+            logger.info(f"Downloaded {json_path}")
+
+            logger.info(f"Voice model '{voice_name}' downloaded successfully")
+            return onnx_path
+
+        except Exception as e:
+            logger.error(f"Failed to download voice model: {e}")
+            return None
+
+    async def connect(self):
+        """Initialize Piper model"""
+        try:
+            # Import here to avoid requiring it if not used
+            from piper.voice import PiperVoice
+
+            # If no voice path specified, try to download default voice
+            if not self.voice_path:
+                logger.info(f"No voice model specified, downloading default voice '{self.default_voice}'...")
+                self.voice_path = await self._download_voice_model(self.default_voice)
+
+                if not self.voice_path:
+                    logger.error("Failed to download default voice model")
+                    logger.error("You can manually download voices from: https://huggingface.co/rhasspy/piper-voices")
+                    logger.error("Or set PIPER_VOICE_PATH in .env to a valid voice model path")
+                    self.connected = False
+                    raise RuntimeError("Piper voice model not available. Cannot initialize TTS.")
+
+            # If voice path specified but doesn't exist, try to extract voice name and download
+            elif not os.path.exists(self.voice_path):
+                logger.warning(f"Voice model file not found: {self.voice_path}")
+
+                # Try to extract voice name from path
+                voice_name = os.path.basename(self.voice_path).replace('.onnx', '')
+                logger.info(f"Attempting to download voice model '{voice_name}'...")
+
+                downloaded_path = await self._download_voice_model(voice_name)
+                if downloaded_path:
+                    self.voice_path = downloaded_path
+                else:
+                    logger.error("Failed to download voice model")
+                    logger.error("Download voice models from: https://huggingface.co/rhasspy/piper-voices")
+                    logger.error("Or set PIPER_VOICE_PATH in .env to a valid voice model path")
+                    self.connected = False
+                    raise RuntimeError("Piper voice model not available. Cannot initialize TTS.")
+
+            logger.info(f"Loading Piper voice model from {self.voice_path}...")
+            self.tts = PiperVoice.load(self.voice_path)
+
+            self.connected = True
+            logger.info("Piper TTS model loaded successfully")
+        except ImportError as e:
+            logger.error(f"Failed to import Piper TTS. Install with: pip install -r requirements-piper.txt")
+            logger.error(f"Error: {e}")
+            self.connected = False
+            raise
+        except Exception as e:
+            logger.error(f"Failed to initialize Piper client: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+            self.connected = False
+            raise
+
+    async def send_transcription(self, text):
+        """Generate speech from transcription using Piper"""
+        if not self.connected:
+            logger.warning("Piper client not initialized, attempting to connect...")
+            await self.connect()
+
+        if self.connected and self.tts:
+            try:
+                # Use synthesize() which yields AudioChunk objects
+                audio_chunks = []
+                sample_rate = None
+
+                # Collect audio chunks from generator
+                for audio_chunk in self.tts.synthesize(text):
+                    # AudioChunk has audio_float_array property with numpy array
+                    audio_chunks.append(audio_chunk.audio_float_array)
+                    # Get sample rate from first chunk
+                    if sample_rate is None:
+                        sample_rate = audio_chunk.sample_rate
+
+                # Combine all chunks into single array
+                if audio_chunks:
+                    wav = np.concatenate(audio_chunks)
+
+                    # Use default sample rate if not set
+                    if sample_rate is None:
+                        sample_rate = 22050
+
+                    logger.info(f"Generated speech for: {text}")
+
+                    # Play audio if audio player is available
+                    if self.audio_player:
+                        self.audio_player.play(wav, sample_rate=sample_rate)
+                        logger.info("Audio queued for playback")
+                    else:
+                        logger.warning("No audio player available, audio not played")
+                else:
+                    logger.warning("No audio generated by Piper")
+
+            except Exception as e:
+                logger.error(f"Error generating speech with Piper: {e}")
+                import traceback
+                logger.error(traceback.format_exc())
+
+    async def close(self):
+        """Close Piper client"""
+        self.tts = None
+        self.connected = False
+        logger.info("Closed Piper client")
+
+
+class StyleTTS2Client:
+    """Local StyleTTS2 TTS client with voice cloning"""
+
+    def __init__(self, ref_audio=STYLETTS2_REF_AUDIO, audio_player=None):
+        self.ref_audio = ref_audio
+        self.tts = None
+        self.connected = False
+        self.audio_player = audio_player
+
+    async def connect(self):
+        """Initialize StyleTTS2 model"""
+        try:
+            # Import here to avoid requiring it if not used
+            from styletts2 import tts
+
+            logger.info("Loading StyleTTS2 model...")
+            logger.info("Note: On first run, StyleTTS2 will automatically download model files from HuggingFace")
+            logger.info("This is a one-time download (~500MB-1GB) and may take several minutes")
+
+            self.tts = tts.StyleTTS2()
+
+            # Validate reference audio if voice cloning is desired
+            if self.ref_audio and not os.path.exists(self.ref_audio):
+                logger.warning(f"Reference audio file not found: {self.ref_audio}")
+                logger.warning("Will use default voice. Provide reference audio for voice cloning.")
+
+            self.connected = True
+            logger.info("StyleTTS2 model loaded successfully")
+        except ImportError as e:
+            logger.error(f"Failed to import StyleTTS2. Install with: pip install -r requirements-styletts2.txt")
+            logger.error(f"Error: {e}")
+            self.connected = False
+        except Exception as e:
+            logger.error(f"Failed to initialize StyleTTS2 client: {e}")
+            self.connected = False
+
+    async def send_transcription(self, text):
+        """Generate speech from transcription using StyleTTS2"""
+        if not self.connected:
+            logger.warning("StyleTTS2 client not initialized, attempting to connect...")
+            await self.connect()
+
+        if self.connected and self.tts:
+            try:
+                # Generate speech with optional voice cloning
+                if self.ref_audio and os.path.exists(self.ref_audio):
+                    # Use voice cloning
+                    wav = self.tts.inference(
+                        text,
+                        target_voice_path=self.ref_audio,
+                        output_wav_file=None,  # Return audio instead of saving
+                        output_sample_rate=24000
+                    )
+                else:
+                    # Use default voice
+                    wav = self.tts.inference(
+                        text,
+                        output_wav_file=None,
+                        output_sample_rate=24000
+                    )
+
+                logger.info(f"Generated speech for: {text}")
+
+                # Play audio if audio player is available
+                if self.audio_player:
+                    # StyleTTS2 returns tuple (audio, sample_rate)
+                    if isinstance(wav, tuple):
+                        audio_data, sample_rate = wav
+                    else:
+                        audio_data = wav
+                        sample_rate = 24000
+
+                    # Convert to numpy array if needed
+                    if not isinstance(audio_data, np.ndarray):
+                        audio_data = np.array(audio_data, dtype=np.float32)
+
+                    self.audio_player.play(audio_data, sample_rate=sample_rate)
+                    logger.info("Audio queued for playback")
+                else:
+                    logger.warning("No audio player available, audio not played")
+
+            except Exception as e:
+                logger.error(f"Error generating speech with StyleTTS2: {e}")
+
+    async def close(self):
+        """Close StyleTTS2 client"""
+        self.tts = None
+        self.connected = False
+        logger.info("Closed StyleTTS2 client")
+
+
 def create_tts_client(audio_player=None):
     """Factory function to create appropriate TTS client based on configuration"""
     if TTS_SERVICE == "neutts":
         logger.info("Using NeuTTS Air local TTS service")
         return NeuTTSClient(audio_player=audio_player)
+    elif TTS_SERVICE == "piper":
+        logger.info("Using Piper TTS service")
+        return PiperClient(audio_player=audio_player)
+    elif TTS_SERVICE == "styletts2":
+        logger.info("Using StyleTTS2 TTS service")
+        return StyleTTS2Client(audio_player=audio_player)
     else:
         logger.info("Using Speakerbot TTS service")
         return SpeakerbotClient()
@@ -460,56 +838,74 @@ class SpeechToTextApp:
     async def run(self):
         """Run the main application loop"""
         logger.info("Starting Speech-to-Text application...")
-        
-        # Select microphone
-        mic_selector = MicrophoneSelector()
-        device_index = mic_selector.show()
-        if device_index is not None:
-            self.recorder = AudioRecorder(device_index=device_index)
-        else:
-            logger.error("No microphone selected, exiting...")
-            return
-        
-        # Select output device (only for NeuTTS)
-        if TTS_SERVICE == "neutts":
-            output_selector = OutputDeviceSelector()
-            output_device_index = output_selector.show()
-            if output_device_index is not None:
-                self.audio_player = AudioPlayer(device_index=output_device_index)
-                self.audio_player.start()
-                logger.info(f"Audio player initialized with device {output_device_index}")
-            else:
-                logger.error("No output device selected, exiting...")
-                return
-        
-        # Create TTS client with audio player
-        self.client = create_tts_client(audio_player=self.audio_player)
-        
-        # Connect to TTS service
-        await self.client.connect()
 
-        # Start audio recording
-        self.recorder.start()
-        self.running = True
-        
         try:
+            # Determine if we need output device selection
+            need_output = TTS_SERVICE in ["neutts", "piper", "styletts2"]
+
+            # Show unified device selector
+            selector = AudioDeviceSelector(need_output=need_output)
+            input_device_index, output_device_index = selector.show()
+
+            # Check if user cancelled
+            if input_device_index is None:
+                logger.info("Device selection cancelled, exiting...")
+                return
+
+            # Initialize audio recorder with selected input device
+            self.recorder = AudioRecorder(device_index=input_device_index)
+            logger.info(f"Using microphone device: {input_device_index}")
+
+            # Initialize audio player if output device was selected
+            if need_output:
+                if output_device_index is not None:
+                    self.audio_player = AudioPlayer(device_index=output_device_index)
+                    self.audio_player.start()
+                    logger.info(f"Using output device: {output_device_index}")
+                else:
+                    logger.error("No output device selected, exiting...")
+                    return
+
+            # Create TTS client with audio player
+            self.client = create_tts_client(audio_player=self.audio_player)
+
+            # Connect to TTS service
+            logger.info("Connecting to TTS service...")
+            await self.client.connect()
+
+            # Check if connection was successful
+            if not self.client.connected:
+                logger.error("Failed to connect to TTS service. Exiting...")
+                await self.shutdown()
+                return
+
+            # Start audio recording
+            self.recorder.start()
+            self.running = True
+
+            logger.info("Application is running. Press Ctrl+C to stop.")
+
             while self.running:
                 # Get audio chunk
                 audio_chunk = self.recorder.get_audio_chunk(timeout=0.1)
-                
+
                 if audio_chunk is not None:
                     # Transcribe audio
                     text = self.transcriber.transcribe(audio_chunk)
-                    
+
                     if text:
                         # Send to TTS service
                         await self.client.send_transcription(text)
-                        
+
                 # Small delay to prevent tight loop
                 await asyncio.sleep(0.01)
-                
+
         except KeyboardInterrupt:
             logger.info("Received interrupt signal")
+        except Exception as e:
+            logger.error(f"Error in main loop: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
         finally:
             await self.shutdown()
             

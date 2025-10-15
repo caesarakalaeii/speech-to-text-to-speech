@@ -21,6 +21,10 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+# Ensure we're running from the script's directory
+$ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+Set-Location $ScriptDir
+
 # Script configuration
 $PYTHON_VERSION = "3.11"
 $CUDA_VERSION = "12.1"  # Compatible with PyTorch 2.x
@@ -351,36 +355,147 @@ function Install-BaseRequirements {
     }
 }
 
-# Ask about NeuTTS installation
-function Install-NeuTTS {
-    param([bool]$CudaInstalled = $false)
-    
-    Write-Host "\n$('=' * 80)" -ForegroundColor Cyan; Write-Host "  NeuTTS Air - Local Neural TTS with Voice Cloning" -ForegroundColor Cyan; Write-Host "$('=' * 80)\n" -ForegroundColor Cyan
-    
+# Ask user which TTS service to install
+function Select-TTSService {
+    Write-Host "\n$('=' * 80)" -ForegroundColor Cyan
+    Write-Host "  TTS (Text-to-Speech) Service Selection" -ForegroundColor Cyan
+    Write-Host "$('=' * 80)\n" -ForegroundColor Cyan
+
     Write-Host @"
-This project supports two TTS (Text-to-Speech) options:
+This project supports multiple TTS options:
 
-1. Speakerbot (default):
-   • Uses external WebSocket TTS service
+1. Speakerbot (default - no installation needed):
+   • External WebSocket TTS service
    • Requires Speakerbot running separately
-   • Lightweight, minimal dependencies
+   • Zero local dependencies
+   • Network dependent
 
-2. NeuTTS Air (optional):
-   • Completely offline, local neural TTS
-   • Voice cloning from 3-15 second audio samples
-   • High-quality speech synthesis
-   • No API calls or subscription fees
-   • Requires ~2-4GB additional disk space
-   • Works better with GPU but runs on CPU
+2. Piper (simplest local option):
+   • Fast local TTS with ONNX
+   • Pre-trained voices only (no voice cloning)
+   • Very lightweight (~100MB)
+   • Runs fast on CPU
+   • MIT licensed
+
+3. StyleTTS2 (modern voice cloning):
+   • Local neural TTS with voice cloning
+   • Clone voice from 3-15 second samples
+   • Simpler than NeuTTS (no espeak-ng needed)
+   • Requires PyTorch (~1-2GB)
+   • MIT licensed
+
+4. NeuTTS Air (advanced voice cloning):
+   • High-quality voice cloning
+   • Most features, most complex
+   • Requires PyTorch + espeak-ng (~2-4GB)
+   • Best with GPU
 
 "@
 
-    $install = Read-Host "Install NeuTTS Air dependencies? (y/N)"
-    if ($install -ne "y" -and $install -ne "Y") {
-        Write-Host "ℹ Skipping NeuTTS installation - will use Speakerbot" -ForegroundColor Blue
+    do {
+        Write-Host "Which TTS service would you like to install?" -ForegroundColor Yellow
+        $choice = Read-Host "Enter 1 (Speakerbot), 2 (Piper), 3 (StyleTTS2), or 4 (NeuTTS)"
+
+        if ($choice -in @('1', '2', '3', '4')) {
+            return $choice
+        }
+        Write-Host "Please enter 1, 2, 3, or 4" -ForegroundColor Red
+    } while ($true)
+}
+
+# Install Piper TTS
+function Install-Piper {
+    Write-Host "\n>>> Installing Piper TTS requirements..." -ForegroundColor Yellow
+
+    Write-Host "ℹ This will install:" -ForegroundColor Blue
+    Write-Host "ℹ   - piper-tts (fast local TTS)" -ForegroundColor Blue
+    Write-Host "ℹ This is very lightweight, only ~20MB" -ForegroundColor Blue
+
+    try {
+        & ".\venv\Scripts\pip.exe" install -r requirements-piper.txt | Out-Null
+
+        Write-Host "✓ Piper TTS requirements installed successfully" -ForegroundColor Green
+        Write-Host "`nℹ NOTE: You need to download voice models separately:" -ForegroundColor Blue
+        Write-Host "ℹ   Download from: https://huggingface.co/rhasspy/piper-voices" -ForegroundColor Blue
+        Write-Host "ℹ   Set PIPER_VOICE_PATH in .env to the .onnx file path" -ForegroundColor Blue
+        return $true
+    } catch {
+        Write-Host "✗ Failed to install Piper TTS: $_" -ForegroundColor Red
         return $false
     }
-    
+}
+
+# Install StyleTTS2
+function Install-StyleTTS2 {
+    param([bool]$CudaInstalled = $false)
+
+    Write-Host "\n>>> Installing StyleTTS2 requirements..." -ForegroundColor Yellow
+
+    Write-Host "ℹ This will install:" -ForegroundColor Blue
+    Write-Host "ℹ   - PyTorch (deep learning framework)" -ForegroundColor Blue
+    Write-Host "ℹ   - StyleTTS2 (neural TTS with voice cloning)" -ForegroundColor Blue
+    Write-Host "ℹ This may take several minutes and download ~1-2GB of packages" -ForegroundColor Blue
+
+    # Check for CUDA
+    $hasCuda = $CudaInstalled -or (Test-Path "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA") -or (Test-Path "C:\ProgramData\chocolatey\lib\cuda")
+
+    try {
+        # Install PyTorch first
+        $torchSuccess = $false
+        if ($hasCuda) {
+            Write-Host "ℹ CUDA detected - installing PyTorch 2.4.1 with GPU support..." -ForegroundColor Blue
+            Write-Host "ℹ Using CUDA 12.1 index: https://download.pytorch.org/whl/cu121" -ForegroundColor Blue
+
+            $output = & ".\venv\Scripts\pip.exe" install torch==2.4.1 torchaudio==2.4.1 --index-url https://download.pytorch.org/whl/cu121 2>&1 | Out-String
+
+            if ($LASTEXITCODE -eq 0) {
+                Write-Host "✓ PyTorch 2.4.1 with CUDA support installed successfully" -ForegroundColor Green
+                $torchSuccess = $true
+            } else {
+                Write-Host "⚠ Failed to install PyTorch with CUDA support" -ForegroundColor Yellow
+                Write-Host "ℹ Falling back to CPU version..." -ForegroundColor Blue
+            }
+        }
+
+        if (-not $torchSuccess) {
+            Write-Host "ℹ Installing PyTorch 2.4.1 with CPU support..." -ForegroundColor Blue
+            Write-Host "ℹ Using CPU index: https://download.pytorch.org/whl/cpu" -ForegroundColor Blue
+
+            $output = & ".\venv\Scripts\pip.exe" install torch==2.4.1 torchaudio==2.4.1 --index-url https://download.pytorch.org/whl/cpu 2>&1 | Out-String
+
+            if ($LASTEXITCODE -ne 0) {
+                Write-Host "✗ Failed to install PyTorch: $output" -ForegroundColor Red
+                throw "PyTorch installation failed"
+            }
+            Write-Host "✓ PyTorch 2.4.1 (CPU version) installed successfully" -ForegroundColor Green
+        }
+
+        # Verify PyTorch
+        Write-Host "ℹ Verifying PyTorch installation..." -ForegroundColor Blue
+        $verifyOutput = & ".\venv\Scripts\python.exe" -c "import torch; print(f'PyTorch {torch.__version__}'); print(f'CUDA available: {torch.cuda.is_available()}')" 2>&1
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host "✓ PyTorch verification:" -ForegroundColor Green
+            $verifyOutput | ForEach-Object { Write-Host "  $_" -ForegroundColor Green }
+        }
+
+        # Install StyleTTS2
+        Write-Host "ℹ Installing StyleTTS2..." -ForegroundColor Blue
+        & ".\venv\Scripts\pip.exe" install -r requirements-styletts2.txt | Out-Null
+
+        Write-Host "✓ StyleTTS2 requirements installed successfully" -ForegroundColor Green
+        Write-Host "`nℹ NOTE: On first run, StyleTTS2 will download model files (~500MB-1GB)" -ForegroundColor Blue
+        Write-Host "ℹ This is a one-time download from HuggingFace" -ForegroundColor Blue
+        return $true
+    } catch {
+        Write-Host "✗ Failed to install StyleTTS2 requirements: $_" -ForegroundColor Red
+        return $false
+    }
+}
+
+# Install NeuTTS Air
+function Install-NeuTTS {
+    param([bool]$CudaInstalled = $false)
+
     Write-Host "\n>>> Installing NeuTTS Air requirements..." -ForegroundColor Yellow
     Write-Host "ℹ This will download ~1-2GB of packages and may take several minutes" -ForegroundColor Blue
     
@@ -389,12 +504,46 @@ This project supports two TTS (Text-to-Speech) options:
     $hasCuda = $CudaInstalled -or (Test-Path "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA") -or (Test-Path "C:\ProgramData\chocolatey\lib\cuda")
     
     try {
+        # Install PyTorch first (separate from requirements file for proper CUDA/CPU selection)
+        # Using PyTorch 2.4.1 for compatibility with neucodec and torchao
+        $torchSuccess = $false
         if ($hasCuda) {
-            Write-Host "ℹ CUDA detected - installing PyTorch with GPU support..." -ForegroundColor Blue
-            & ".\venv\Scripts\pip.exe" install torch torchaudio --index-url https://download.pytorch.org/whl/cu121 | Out-Null
+            Write-Host "ℹ CUDA detected - installing PyTorch 2.4.1 with GPU support..." -ForegroundColor Blue
+            Write-Host "ℹ Using CUDA 12.1 index: https://download.pytorch.org/whl/cu121" -ForegroundColor Blue
+            
+            $output = & ".\venv\Scripts\pip.exe" install torch==2.4.1 torchaudio==2.4.1 --index-url https://download.pytorch.org/whl/cu121 2>&1 | Out-String
+            
+            if ($LASTEXITCODE -eq 0) {
+                Write-Host "✓ PyTorch 2.4.1 with CUDA support installed successfully" -ForegroundColor Green
+                $torchSuccess = $true
+            } else {
+                Write-Host "⚠ Failed to install PyTorch with CUDA support" -ForegroundColor Yellow
+                Write-Host "ℹ Error: $output" -ForegroundColor Yellow
+                Write-Host "ℹ Falling back to CPU version..." -ForegroundColor Blue
+            }
+        }
+        
+        if (-not $torchSuccess) {
+            Write-Host "ℹ Installing PyTorch 2.4.1 with CPU support..." -ForegroundColor Blue
+            Write-Host "ℹ Using CPU index: https://download.pytorch.org/whl/cpu" -ForegroundColor Blue
+            
+            $output = & ".\venv\Scripts\pip.exe" install torch==2.4.1 torchaudio==2.4.1 --index-url https://download.pytorch.org/whl/cpu 2>&1 | Out-String
+            
+            if ($LASTEXITCODE -ne 0) {
+                Write-Host "✗ Failed to install PyTorch: $output" -ForegroundColor Red
+                throw "PyTorch installation failed"
+            }
+            Write-Host "✓ PyTorch 2.4.1 (CPU version) installed successfully" -ForegroundColor Green
+        }
+        
+        # Verify PyTorch installation
+        Write-Host "ℹ Verifying PyTorch installation..." -ForegroundColor Blue
+        $verifyOutput = & ".\venv\Scripts\python.exe" -c "import torch; print(f'PyTorch {torch.__version__}'); print(f'CUDA available: {torch.cuda.is_available()}')" 2>&1
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host "✓ PyTorch verification:" -ForegroundColor Green
+            $verifyOutput | ForEach-Object { Write-Host "  $_" -ForegroundColor Green }
         } else {
-            Write-Host "ℹ Installing PyTorch with CPU support..." -ForegroundColor Blue
-            & ".\venv\Scripts\pip.exe" install torch torchaudio --index-url https://download.pytorch.org/whl/cpu | Out-Null
+            Write-Host "⚠ Could not verify PyTorch installation" -ForegroundColor Yellow
         }
         
         Write-Host "ℹ Installing NeuTTS dependencies..." -ForegroundColor Blue
@@ -405,17 +554,18 @@ This project supports two TTS (Text-to-Speech) options:
     } catch {
         Write-Host "✗ Failed to install NeuTTS requirements: $_" -ForegroundColor Red
         Write-Host "ℹ You can try manually installing later with:" -ForegroundColor Blue
-        Write-Host 'ℹ   .\venv\Scripts\pip.exe install -r requirements-neutts.txt' -ForegroundColor Blue
+        Write-Host 'ℹ   First: .\venv\Scripts\pip.exe install torch==2.4.1 torchaudio==2.4.1 --index-url https://download.pytorch.org/whl/cu121' -ForegroundColor Blue
+        Write-Host 'ℹ   Then:  .\venv\Scripts\pip.exe install -r requirements-neutts.txt' -ForegroundColor Blue
         return $false
     }
 }
 
 # Setup .env configuration file
 function Initialize-Configuration {
-    param([bool]$NeuTTSInstalled)
-    
+    param([string]$TTSChoice)
+
     Write-Host "\n>>> Setting up configuration file..." -ForegroundColor Yellow
-    
+
     if (Test-Path ".env") {
         Write-Host "✓ .env file already exists" -ForegroundColor Green
         $overwrite = Read-Host "Overwrite with defaults? (y/N)"
@@ -424,20 +574,26 @@ function Initialize-Configuration {
             return $true
         }
     }
-    
+
+    # Map choice to service name
+    $ttsService = switch ($TTSChoice) {
+        '1' { "speakerbot" }
+        '2' { "piper" }
+        '3' { "styletts2" }
+        '4' { "neutts" }
+        default { "speakerbot" }
+    }
+
     try {
         if (Test-Path ".env.example") {
             Copy-Item ".env.example" ".env" | Out-Null
             Write-Host "✓ Created .env from .env.example" -ForegroundColor Green
-            
-            # Update TTS_SERVICE based on installation
-            if ($NeuTTSInstalled) {
-                (Get-Content ".env") -replace "TTS_SERVICE=speakerbot", "TTS_SERVICE=neutts" | Set-Content ".env"
-                Write-Host "ℹ Set TTS_SERVICE=neutts in .env" -ForegroundColor Blue
-            }
+
+            # Update TTS_SERVICE based on choice
+            (Get-Content ".env") -replace "TTS_SERVICE=speakerbot", "TTS_SERVICE=$ttsService" | Set-Content ".env"
+            Write-Host "ℹ Set TTS_SERVICE=$ttsService in .env" -ForegroundColor Blue
         } else {
             # Create basic .env file
-            $ttsService = if ($NeuTTSInstalled) { "neutts" } else { "speakerbot" }
             $envContent = @"
 TTS_SERVICE=$ttsService
 WHISPER_MODEL=base
@@ -445,6 +601,12 @@ WHISPER_MODEL=base
 # Speakerbot settings
 SPEAKERBOT_WEBSOCKET_URL=ws://localhost:8080
 VOICE_NAME=Sally
+
+# Piper settings
+PIPER_VOICE_PATH=
+
+# StyleTTS2 settings
+STYLETTS2_REF_AUDIO=samples/reference.wav
 
 # NeuTTS Air settings
 NEUTTS_BACKBONE=neuphonic/neutts-air-q4-gguf
@@ -463,7 +625,7 @@ MIN_SPEECH_DURATION=0.5
             Set-Content ".env" $envContent | Out-Null
             Write-Host "✓ Created basic .env file" -ForegroundColor Green
         }
-        
+
         return $true
     } catch {
         Write-Host "✗ Failed to create .env file: $_" -ForegroundColor Red
@@ -473,10 +635,10 @@ MIN_SPEECH_DURATION=0.5
 
 # Print next steps
 function Show-NextSteps {
-    param([bool]$NeuTTSInstalled, [bool]$CudaInstalled)
-    
+    param([string]$TTSChoice, [bool]$CudaInstalled)
+
     Write-Host "\n$('=' * 80)" -ForegroundColor Cyan; Write-Host "  Installation Complete!" -ForegroundColor Cyan; Write-Host "$('=' * 80)\n" -ForegroundColor Cyan
-    
+
     Write-Host @"
 
 🎉 Installation finished successfully!
@@ -492,24 +654,49 @@ $('─' * 80)
 
 "@
 
-    if ($NeuTTSInstalled) {
-        Write-Host @"
-2️⃣  For NeuTTS Air:
-   • Prepare a reference audio file (3-15 seconds, .wav format)
-   • Create a text file with the transcription
-   • Update NEUTTS_REF_AUDIO and NEUTTS_REF_TEXT in .env
-   • Sample files are in the 'samples/' directory
-   • Set NEUTTS_BACKBONE_DEVICE=cuda if you have GPU
-
-"@
-    } else {
-        Write-Host @"
+    # Show service-specific instructions
+    switch ($TTSChoice) {
+        '1' {
+            Write-Host @"
 2️⃣  For Speakerbot:
    • Make sure Speakerbot is running
    • Update SPEAKERBOT_WEBSOCKET_URL in .env
    • Set your preferred VOICE_NAME
 
 "@
+        }
+        '2' {
+            Write-Host @"
+2️⃣  For Piper TTS:
+   • Download a voice model from: https://huggingface.co/rhasspy/piper-voices
+   • Extract the .onnx and .onnx.json files
+   • Set PIPER_VOICE_PATH in .env to the .onnx file path
+   • Example: PIPER_VOICE_PATH=voices/en_US-amy-medium.onnx
+
+"@
+        }
+        '3' {
+            Write-Host @"
+2️⃣  For StyleTTS2:
+   • (Optional) Prepare a reference audio file for voice cloning
+   • Audio should be 3-15 seconds, any format (mp3, wav, etc.)
+   • Set STYLETTS2_REF_AUDIO in .env (leave empty for default voice)
+   • On first run, StyleTTS2 will download models (~500MB-1GB)
+
+"@
+        }
+        '4' {
+            Write-Host @"
+2️⃣  For NeuTTS Air:
+   • Prepare a reference audio file (3-15 seconds, .wav format)
+   • Create a text file with the transcription
+   • Update NEUTTS_REF_AUDIO and NEUTTS_REF_TEXT in .env
+   • Sample files are in the 'samples/' directory
+   • Set NEUTTS_BACKBONE_DEVICE=cuda if you have GPU
+   • On first run, NeuTTS will download models (~1-2GB)
+
+"@
+        }
     }
 
     Write-Host @"
@@ -522,15 +709,10 @@ $('─' * 80)
 
     if ($CudaInstalled) {
         Write-Host "⚠ CUDA was installed - you may need to restart your computer for GPU acceleration to work" -ForegroundColor Yellow
-    }
-
-    if ($NeuTTSInstalled) {
-        Write-Host "ℹ On first run, NeuTTS will download model files (~1-2GB)" -ForegroundColor Blue
-        Write-Host "ℹ This is a one-time download and may take several minutes" -ForegroundColor Blue
+        Write-Host ""
     }
 
     Write-Host @"
-
 $('─' * 80)
 📚 Documentation:
    • README.md - Full documentation
@@ -546,57 +728,71 @@ Need help? Check the README or open an issue on GitHub!
 # Main installation flow
 function Start-Installation {
     Write-Host "\n$('=' * 80)" -ForegroundColor Cyan; Write-Host "  Speech-to-Text-to-Speech Windows Setup" -ForegroundColor Cyan; Write-Host "$('=' * 80)\n" -ForegroundColor Cyan
-    
+
     Write-Host "ℹ This installer will set up all dependencies for the speech-to-text-to-speech application" -ForegroundColor Blue
-    Write-Host "ℹ This includes: Python, FFmpeg, espeak-ng, and optionally CUDA for GPU acceleration" -ForegroundColor Blue
+    Write-Host "ℹ This includes: Python, FFmpeg, and your choice of TTS service" -ForegroundColor Blue
     Write-Host ""
-    
+
     $continue = Read-Host "Continue with installation? (Y/n)"
     if ($continue -eq "n" -or $continue -eq "N") {
         Write-Host "ℹ Installation cancelled" -ForegroundColor Blue
         exit 0
     }
-    
+
     # Install Chocolatey
     if (-not (Install-Chocolatey)) {
         Write-Host "✗ Failed to install Chocolatey. Cannot continue." -ForegroundColor Red
         Read-Host "Press Enter to exit"
         exit 1
     }
-    
+
     # Install Python
     if (-not (Install-Python)) {
         Write-Host "✗ Failed to install Python. Cannot continue." -ForegroundColor Red
         Read-Host "Press Enter to exit"
         exit 1
     }
-    
+
     # Install FFmpeg
     if (-not (Install-FFmpeg)) {
         Write-Host "✗ Failed to install FFmpeg. Cannot continue." -ForegroundColor Red
         Read-Host "Press Enter to exit"
         exit 1
     }
-    
-    # Install espeak-ng
-    $espeakInstalled = Install-ESpeak
-    
-    # Ask about CUDA
-    $cudaInstalled = $false
-    if (Test-NvidiaGPU) {
-        $cudaInstalled = Install-CUDA
+
+    # Ask user which TTS service to install
+    $ttsChoice = Select-TTSService
+
+    # Install espeak-ng only if NeuTTS is selected
+    if ($ttsChoice -eq '4') {
+        $espeakInstalled = Install-ESpeak
+        if (-not $espeakInstalled) {
+            Write-Host "⚠ espeak-ng installation failed. NeuTTS may not work correctly." -ForegroundColor Yellow
+            $continue = Read-Host "Continue anyway? (Y/n)"
+            if ($continue -eq "n" -or $continue -eq "N") {
+                exit 1
+            }
+        }
     }
-    
+
+    # Ask about CUDA if installing StyleTTS2 or NeuTTS
+    $cudaInstalled = $false
+    if ($ttsChoice -in @('3', '4')) {
+        if (Test-NvidiaGPU) {
+            $cudaInstalled = Install-CUDA
+        }
+    }
+
     # Create virtual environment
     if (-not (New-VirtualEnvironment)) {
         Write-Host "✗ Failed to create virtual environment. Cannot continue." -ForegroundColor Red
         Read-Host "Press Enter to exit"
         exit 1
     }
-    
+
     # Upgrade pip
     Update-Pip
-    
+
     # Install base requirements
     if (-not (Install-BaseRequirements)) {
         Write-Host "✗ Failed to install base requirements." -ForegroundColor Red
@@ -605,16 +801,39 @@ function Start-Installation {
             exit 1
         }
     }
-    
-    # Install NeuTTS (optional)
-    $neuttsInstalled = Install-NeuTTS -CudaInstalled $cudaInstalled
-    
+
+    # Install TTS service based on choice
+    $ttsInstalled = $true
+    switch ($ttsChoice) {
+        '1' {
+            Write-Host "`nℹ Speakerbot selected - no additional dependencies needed" -ForegroundColor Blue
+            Write-Host "ℹ Make sure you have Speakerbot running separately" -ForegroundColor Blue
+        }
+        '2' {
+            $ttsInstalled = Install-Piper
+        }
+        '3' {
+            $ttsInstalled = Install-StyleTTS2 -CudaInstalled $cudaInstalled
+        }
+        '4' {
+            $ttsInstalled = Install-NeuTTS -CudaInstalled $cudaInstalled
+        }
+    }
+
+    if (-not $ttsInstalled) {
+        Write-Host "`n⚠ TTS installation failed, but base application is functional" -ForegroundColor Yellow
+        $continue = Read-Host "Continue with setup? (Y/n)"
+        if ($continue -eq "n" -or $continue -eq "N") {
+            exit 1
+        }
+    }
+
     # Setup configuration
-    $configResult = Initialize-Configuration -NeuTTSInstalled $neuttsInstalled
-    
+    $configResult = Initialize-Configuration -TTSChoice $ttsChoice
+
     # Show next steps
-    Show-NextSteps -NeuTTSInstalled $neuttsInstalled -CudaInstalled $cudaInstalled
-    
+    Show-NextSteps -TTSChoice $ttsChoice -CudaInstalled $cudaInstalled
+
     Write-Host ""
     Read-Host "Press Enter to exit"
 }

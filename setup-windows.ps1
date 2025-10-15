@@ -446,7 +446,7 @@ function Install-StyleTTS2 {
             Write-Host "ℹ CUDA detected - installing PyTorch 2.4.1 with GPU support..." -ForegroundColor Blue
             Write-Host "ℹ Using CUDA 12.1 index: https://download.pytorch.org/whl/cu121" -ForegroundColor Blue
 
-            $output = & ".\venv\Scripts\pip.exe" install torch==2.4.1 torchaudio==2.4.1 --index-url https://download.pytorch.org/whl/cu121 2>&1 | Out-String
+            $output = & ".\venv\Scripts\pip.exe" install torch==2.4.1 torchaudio==2.4.1 --extra-index-url https://download.pytorch.org/whl/cu121 2>&1 | Out-String
 
             if ($LASTEXITCODE -eq 0) {
                 Write-Host "✓ PyTorch 2.4.1 with CUDA support installed successfully" -ForegroundColor Green
@@ -461,7 +461,7 @@ function Install-StyleTTS2 {
             Write-Host "ℹ Installing PyTorch 2.4.1 with CPU support..." -ForegroundColor Blue
             Write-Host "ℹ Using CPU index: https://download.pytorch.org/whl/cpu" -ForegroundColor Blue
 
-            $output = & ".\venv\Scripts\pip.exe" install torch==2.4.1 torchaudio==2.4.1 --index-url https://download.pytorch.org/whl/cpu 2>&1 | Out-String
+            $output = & ".\venv\Scripts\pip.exe" install torch==2.4.1 torchaudio==2.4.1 --extra-index-url https://download.pytorch.org/whl/cpu 2>&1 | Out-String
 
             if ($LASTEXITCODE -ne 0) {
                 Write-Host "✗ Failed to install PyTorch: $output" -ForegroundColor Red
@@ -510,9 +510,9 @@ function Install-NeuTTS {
         if ($hasCuda) {
             Write-Host "ℹ CUDA detected - installing PyTorch 2.4.1 with GPU support..." -ForegroundColor Blue
             Write-Host "ℹ Using CUDA 12.1 index: https://download.pytorch.org/whl/cu121" -ForegroundColor Blue
-            
-            $output = & ".\venv\Scripts\pip.exe" install torch==2.4.1 torchaudio==2.4.1 --index-url https://download.pytorch.org/whl/cu121 2>&1 | Out-String
-            
+
+            $output = & ".\venv\Scripts\pip.exe" install torch==2.4.1 torchaudio==2.4.1 --extra-index-url https://download.pytorch.org/whl/cu121 2>&1 | Out-String
+
             if ($LASTEXITCODE -eq 0) {
                 Write-Host "✓ PyTorch 2.4.1 with CUDA support installed successfully" -ForegroundColor Green
                 $torchSuccess = $true
@@ -522,12 +522,12 @@ function Install-NeuTTS {
                 Write-Host "ℹ Falling back to CPU version..." -ForegroundColor Blue
             }
         }
-        
+
         if (-not $torchSuccess) {
             Write-Host "ℹ Installing PyTorch 2.4.1 with CPU support..." -ForegroundColor Blue
             Write-Host "ℹ Using CPU index: https://download.pytorch.org/whl/cpu" -ForegroundColor Blue
-            
-            $output = & ".\venv\Scripts\pip.exe" install torch==2.4.1 torchaudio==2.4.1 --index-url https://download.pytorch.org/whl/cpu 2>&1 | Out-String
+
+            $output = & ".\venv\Scripts\pip.exe" install torch==2.4.1 torchaudio==2.4.1 --extra-index-url https://download.pytorch.org/whl/cpu 2>&1 | Out-String
             
             if ($LASTEXITCODE -ne 0) {
                 Write-Host "✗ Failed to install PyTorch: $output" -ForegroundColor Red
@@ -554,8 +554,9 @@ function Install-NeuTTS {
     } catch {
         Write-Host "✗ Failed to install NeuTTS requirements: $_" -ForegroundColor Red
         Write-Host "ℹ You can try manually installing later with:" -ForegroundColor Blue
-        Write-Host 'ℹ   First: .\venv\Scripts\pip.exe install torch==2.4.1 torchaudio==2.4.1 --index-url https://download.pytorch.org/whl/cu121' -ForegroundColor Blue
-        Write-Host 'ℹ   Then:  .\venv\Scripts\pip.exe install -r requirements-neutts.txt' -ForegroundColor Blue
+        Write-Host 'ℹ   GPU:  .\venv\Scripts\pip.exe install torch==2.4.1 torchaudio==2.4.1 --extra-index-url https://download.pytorch.org/whl/cu121' -ForegroundColor Blue
+        Write-Host 'ℹ   CPU:  .\venv\Scripts\pip.exe install torch==2.4.1 torchaudio==2.4.1 --extra-index-url https://download.pytorch.org/whl/cpu' -ForegroundColor Blue
+        Write-Host 'ℹ   Then: .\venv\Scripts\pip.exe install -r requirements-neutts.txt' -ForegroundColor Blue
         return $false
     }
 }

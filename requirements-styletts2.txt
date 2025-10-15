@@ -3,9 +3,9 @@
 # Installation: pip install -r requirements-styletts2.txt
 
 # PyTorch (install BEFORE this file for proper CUDA/CPU selection)
-# IMPORTANT: Install PyTorch 2.0+ first using ONE of these commands:
-#   CPU: pip install torch==2.4.1 torchaudio==2.4.1 --index-url https://download.pytorch.org/whl/cpu
-#   CUDA 12.1: pip install torch==2.4.1 torchaudio==2.4.1 --index-url https://download.pytorch.org/whl/cu121
+# IMPORTANT: Install PyTorch 2.4.1 first using ONE of these commands:
+#   CPU: pip install torch==2.4.1 torchaudio==2.4.1 --extra-index-url https://download.pytorch.org/whl/cpu
+#   CUDA 12.1: pip install torch==2.4.1 torchaudio==2.4.1 --extra-index-url https://download.pytorch.org/whl/cu121
 # Then install this requirements file: pip install -r requirements-styletts2.txt
 
 # Base dependencies (required for all TTS services)

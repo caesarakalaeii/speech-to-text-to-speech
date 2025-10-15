@@ -300,15 +300,15 @@ def install_neutts_requirements():
     torch_installed = False
     
     if cuda_available:
-        print("✓ CUDA detected - installing PyTorch with GPU support")
+        print("✓ CUDA detected - installing PyTorch 2.4.1 with GPU support")
         print("  Using CUDA 12.1 index: https://download.pytorch.org/whl/cu121")
         print("")
-        
+
         success, stdout, stderr = run_command(
-            f'"{pip_path}" install torch==2.4.1 torchaudio==2.4.1 --index-url https://download.pytorch.org/whl/cu121',
+            f'"{pip_path}" install torch==2.4.1 torchaudio==2.4.1 --extra-index-url https://download.pytorch.org/whl/cu121',
             check=False
         )
-        
+
         if success:
             print("✓ PyTorch with CUDA support installed successfully")
             torch_installed = True
@@ -316,14 +316,14 @@ def install_neutts_requirements():
             print("⚠ Failed to install PyTorch with CUDA support")
             print(f"  Error: {stderr[:200]}")
             print("  Falling back to CPU version...")
-    
+
     if not torch_installed:
-        print("ℹ Installing PyTorch (CPU version)")
+        print("ℹ Installing PyTorch 2.4.1 (CPU version)")
         print("  Using CPU index: https://download.pytorch.org/whl/cpu")
         print("")
-        
+
         success, stdout, stderr = run_command(
-            f'"{pip_path}" install torch==2.4.1 torchaudio==2.4.1 --index-url https://download.pytorch.org/whl/cpu',
+            f'"{pip_path}" install torch==2.4.1 torchaudio==2.4.1 --extra-index-url https://download.pytorch.org/whl/cpu',
             check=False
         )
         
@@ -333,9 +333,11 @@ def install_neutts_requirements():
             print("\nYou may need to install PyTorch manually:")
             print("Visit: https://pytorch.org/get-started/locally/")
             print("\nFor CPU-only (no GPU):")
-            print(f'  "{pip_path}" install torch torchaudio --index-url https://download.pytorch.org/whl/cpu')
+            print(f'  "{pip_path}" install torch==2.4.1 torchaudio==2.4.1 --extra-index-url https://download.pytorch.org/whl/cpu')
             print("\nFor NVIDIA GPU (CUDA 12.1):")
-            print(f'  "{pip_path}" install torch torchaudio --index-url https://download.pytorch.org/whl/cu121')
+            print(f'  "{pip_path}" install torch==2.4.1 torchaudio==2.4.1 --extra-index-url https://download.pytorch.org/whl/cu121')
+            print("\nAlternatively, try without version constraint:")
+            print(f'  "{pip_path}" install torch torchaudio')
             response = input("\nContinue with remaining packages? (y/n): ").strip().lower()
             if response != 'y':
                 return False
@@ -465,7 +467,7 @@ def install_styletts2_requirements():
         print("")
 
         success, stdout, stderr = run_command(
-            f'"{pip_path}" install torch==2.4.1 torchaudio==2.4.1 --index-url https://download.pytorch.org/whl/cu121',
+            f'"{pip_path}" install torch==2.4.1 torchaudio==2.4.1 --extra-index-url https://download.pytorch.org/whl/cu121',
             check=False
         )
 
@@ -483,7 +485,7 @@ def install_styletts2_requirements():
         print("")
 
         success, stdout, stderr = run_command(
-            f'"{pip_path}" install torch==2.4.1 torchaudio==2.4.1 --index-url https://download.pytorch.org/whl/cpu',
+            f'"{pip_path}" install torch==2.4.1 torchaudio==2.4.1 --extra-index-url https://download.pytorch.org/whl/cpu',
             check=False
         )
 

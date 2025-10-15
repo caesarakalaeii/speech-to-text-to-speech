@@ -19,7 +19,7 @@ numpy>=1.24.0,<2.0.0
 
 # StyleTTS2 - Human-level TTS with voice cloning
 # MIT licensed, supports voice cloning from short samples
-styletts2>=0.8.0
+styletts2>=0.1.6
 
 # Note: StyleTTS2 automatically downloads pre-trained models from HuggingFace
 # Voice cloning works with just a reference audio file (3-15 seconds)

@@ -482,6 +482,10 @@ function Install-StyleTTS2 {
         Write-Host "ℹ Installing StyleTTS2..." -ForegroundColor Blue
         & ".\venv\Scripts\pip.exe" install -r requirements-styletts2.txt | Out-Null
 
+        # Download required NLTK data
+        Write-Host "ℹ Downloading NLTK punkt_tab tokenizer..." -ForegroundColor Blue
+        & ".\venv\Scripts\python.exe" -c "import nltk; nltk.download('punkt_tab', quiet=True)" | Out-Null
+
         Write-Host "✓ StyleTTS2 requirements installed successfully" -ForegroundColor Green
         Write-Host "`nℹ NOTE: On first run, StyleTTS2 will download model files (~500MB-1GB)" -ForegroundColor Blue
         Write-Host "ℹ This is a one-time download from HuggingFace" -ForegroundColor Blue

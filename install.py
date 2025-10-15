@@ -518,6 +518,10 @@ def install_styletts2_requirements():
     success, stdout, stderr = run_command(f'"{pip_path}" install -r requirements-styletts2.txt', check=False)
 
     if success:
+        # Download required NLTK data
+        print("ℹ Downloading NLTK punkt_tab tokenizer...")
+        run_command(f'"{python_path}" -c "import nltk; nltk.download(\'punkt_tab\', quiet=True)"', check=False)
+
         print("✓ StyleTTS2 requirements installed successfully")
         print("\n📝 NOTE: On first run, StyleTTS2 will download model files (~500MB-1GB)")
         print("   This is a one-time download from HuggingFace")

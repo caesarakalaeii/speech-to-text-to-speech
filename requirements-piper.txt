@@ -2,6 +2,13 @@
 # Install these if you want to use Piper TTS
 # Installation: pip install -r requirements-piper.txt
 
+# Base dependencies (required for all TTS services)
+openai-whisper==20231117
+numpy>=1.24.0,<2.0.0
+pyaudio>=0.2.13
+python-dotenv>=1.0.0
+websockets>=12.0
+
 # Piper TTS - Fast, local neural TTS with ONNX runtime
 # MIT licensed, runs on CPU efficiently
 piper-tts>=1.3.0

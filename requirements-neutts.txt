@@ -8,14 +8,21 @@
 #   CUDA 12.1: pip install torch==2.4.1 torchaudio==2.4.1 --index-url https://download.pytorch.org/whl/cu121
 # Then install this requirements file: pip install -r requirements-neutts.txt
 
+# Base dependencies (required for all TTS services)
+openai-whisper==20231117
+pyaudio>=0.2.13
+python-dotenv>=1.0.0
+websockets>=12.0
+
+# NumPy 1.x required for compatibility with PyTorch 2.4.1
+numpy>=1.24.0,<2.0.0
+
 # Core NeuTTS dependencies (from neutts-air repository)
-# Note: NumPy 1.x required for compatibility with PyTorch 2.4.1
-# triton removed - it's Linux-only and not needed on Windows
+# Note: triton removed - it's Linux-only and not needed on Windows
 einops>=0.7.0
 tqdm>=4.65.0
 librosa==0.11.0
 neucodec==0.0.3
-numpy>=1.24.0,<2.0.0
 phonemizer==3.3.0
 soundfile==0.13.1
 transformers==4.44.2

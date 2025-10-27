@@ -887,15 +887,16 @@ def main():
     stt_choice = ask_stt_service()
 
     # Install STT-specific dependencies
-    stt_installed = True
+    stt_setup_successful = True
     if stt_choice == '1':
-        print("\n✓ Whisper selected - no additional dependencies needed (already in base)")
+        print("\n✓ Whisper selected - no additional dependencies needed (already in base requirements)")
+        # stt_setup_successful remains True, since base requirements were checked above
     elif stt_choice == '2':
         print("\n✓ Installing Parakeet TDT...")
-        stt_installed = install_parakeet_requirements()
+        stt_setup_successful = install_parakeet_requirements()
 
-    if not stt_installed:
-        print("\n⚠ STT installation encountered issues.")
+    if not stt_setup_successful:
+        print("\n⚠ STT setup encountered issues.")
         print("You can reconfigure later by editing .env")
 
     # Ask about TTS service

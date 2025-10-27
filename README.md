@@ -1,17 +1,17 @@
 # speech-to-text-to-speech
 
-Simple locally hosted Whisper application to generate speech transcriptions and send them to a Speakerbot websocket endpoint, inspired by Zentreya's TTS setup.
+Simple locally hosted speech-to-text-to-speech application inspired by Zentreya's TTS setup. Supports multiple STT engines (Whisper, Parakeet) and TTS services (Speakerbot, NeuTTS, Piper, StyleTTS2).
 
 ## Features
 
 - 🎤 Real-time audio capture from microphone
-- 🧠 Local speech-to-text using OpenAI Whisper
-- 🔌 Multiple TTS service options: Speakerbot WebSocket or NeuTTS Air (local neural TTS)
-- 🎭 Voice cloning support with NeuTTS Air
-- 🔊 Queue-based audio playback with output device selection (NeuTTS)
+- 🧠 **Multiple STT options:** OpenAI Whisper or NVIDIA Parakeet-TDT (ultra-fast, multilingual)
+- 🔌 **Multiple TTS options:** Speakerbot WebSocket, NeuTTS Air, Piper, or StyleTTS2
+- 🎭 Voice cloning support with NeuTTS Air and StyleTTS2
+- 🔊 Queue-based audio playback with output device selection (local TTS)
 - ⚙️ Configurable via environment variables
 - 🐳 Docker support with GPU passthrough
-- 🚀 Easy setup with automated bash script
+- 🚀 Easy setup with automated installation scripts
 
 ## 📚 Tutorials
 
@@ -108,38 +108,65 @@ For GPU support, ensure you have:
 Edit the `.env` file to customize settings:
 
 ```bash
-# TTS Service: speakerbot or neutts
+# STT Service: whisper or parakeet
+STT_SERVICE=whisper
+
+# Whisper model size (if STT_SERVICE=whisper)
+WHISPER_MODEL=base
+
+# Parakeet model (if STT_SERVICE=parakeet)
+PARAKEET_MODEL=nvidia/parakeet-tdt-0.6b-v3
+
+# TTS Service: speakerbot, neutts, piper, or styletts2
 TTS_SERVICE=speakerbot
 
-# Speakerbot WebSocket URL (used when TTS_SERVICE=speakerbot)
+# Speakerbot settings (if TTS_SERVICE=speakerbot)
 SPEAKERBOT_WEBSOCKET_URL=ws://localhost:8080
 VOICE_NAME=Sally
 
-# NeuTTS Air settings (used when TTS_SERVICE=neutts)
-# Backbone model: neuphonic/neutts-air, neuphonic/neutts-air-q4-gguf, neuphonic/neutts-air-q8-gguf
+# NeuTTS Air settings (if TTS_SERVICE=neutts)
 NEUTTS_BACKBONE=neuphonic/neutts-air-q4-gguf
 NEUTTS_BACKBONE_DEVICE=cpu
-NEUTTS_CODEC=neuphonic/neucodec
-NEUTTS_CODEC_DEVICE=cpu
-# Path to reference audio file (3-15 seconds, mono, 16-44kHz, .wav format)
 NEUTTS_REF_AUDIO=samples/reference.wav
-# Path to text file containing transcription of reference audio
 NEUTTS_REF_TEXT=samples/reference.txt
 
-# Whisper model size: tiny, base, small, medium, large
-# Larger models are more accurate but slower
-WHISPER_MODEL=base
+# Piper settings (if TTS_SERVICE=piper)
+PIPER_VOICE_PATH=
+
+# StyleTTS2 settings (if TTS_SERVICE=styletts2)
+STYLETTS2_REF_AUDIO=samples/reference.wav
 
 # Audio settings
 SAMPLE_RATE=16000
 CHUNK_DURATION=3.0
-
-# Speech detection threshold (0.0 to 1.0)
 SILENCE_THRESHOLD=0.01
-
-# Minimum speech duration in seconds
 MIN_SPEECH_DURATION=0.5
 ```
+
+### STT (Speech-to-Text) Service Options
+
+#### Whisper (Default)
+- OpenAI's Whisper speech recognition model
+- Well-established and reliable
+- Multiple model sizes available (tiny to large)
+- Set `STT_SERVICE=whisper` in `.env`
+- Included in base installation
+- Choose model size with `WHISPER_MODEL`:
+  - `tiny`: Fastest, least accurate (~1GB RAM)
+  - `base`: Good balance (~1GB RAM) - **Default**
+  - `small`: Better accuracy (~2GB RAM)
+  - `medium`: High accuracy (~5GB RAM)
+  - `large`: Best accuracy (~10GB RAM)
+
+#### Parakeet TDT
+- NVIDIA's Parakeet-TDT model - ultra-fast transcription
+- **Transcribes 60 minutes of audio per second**
+- Supports 25 European languages with automatic language detection
+- Set `STT_SERVICE=parakeet` in `.env`
+- Install dependencies: `pip install -r requirements-parakeet.txt`
+- Requires PyTorch (automatically configured for CPU or CUDA)
+- Model automatically downloads on first use (~600MB)
+- Best with GPU but works well on CPU
 
 ### TTS Service Options
 
@@ -164,13 +191,21 @@ MIN_SPEECH_DURATION=0.5
   - `neuphonic/neutts-air-q8-gguf`: Better quality, more resources
   - `neuphonic/neutts-air`: Full PyTorch model, highest quality but slowest
 
-### Whisper Model Options
+#### Piper
+- Fast local TTS with ONNX models
+- Pre-trained voices only (no voice cloning)
+- Very lightweight and runs efficiently on CPU
+- Set `TTS_SERVICE=piper` in `.env`
+- Install dependencies: `pip install -r requirements-piper.txt`
+- Voice models auto-download on first use or download from HuggingFace
 
-- `tiny`: Fastest, least accurate (~1GB RAM)
-- `base`: Good balance (~1GB RAM) - **Default**
-- `small`: Better accuracy (~2GB RAM)
-- `medium`: High accuracy (~5GB RAM)
-- `large`: Best accuracy (~10GB RAM)
+#### StyleTTS2
+- Modern neural TTS with voice cloning
+- Clone voices from 3-15 second audio samples
+- Set `TTS_SERVICE=styletts2` in `.env`
+- Install dependencies: `pip install -r requirements-styletts2.txt`
+- Requires PyTorch
+- Optional reference audio for voice cloning
 
 ## Manual Installation
 

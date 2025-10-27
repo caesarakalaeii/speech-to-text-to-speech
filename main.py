@@ -24,6 +24,7 @@ from tkinter import ttk, messagebox
 load_dotenv()
 
 # Configuration
+STT_SERVICE = os.getenv("STT_SERVICE", "whisper").lower()
 TTS_SERVICE = os.getenv("TTS_SERVICE", "speakerbot").lower()
 
 # Speakerbot settings
@@ -44,8 +45,11 @@ PIPER_VOICE_PATH = os.getenv("PIPER_VOICE_PATH", "")
 # StyleTTS2 settings
 STYLETTS2_REF_AUDIO = os.getenv("STYLETTS2_REF_AUDIO", "")
 
-# Whisper and audio settings
+# STT (Speech-to-Text) settings
 WHISPER_MODEL = os.getenv("WHISPER_MODEL", "base")
+PARAKEET_MODEL = os.getenv("PARAKEET_MODEL", "nvidia/parakeet-tdt-0.6b-v3")
+
+# Audio settings
 SAMPLE_RATE = int(os.getenv("SAMPLE_RATE", "16000"))
 CHUNK_DURATION = float(os.getenv("CHUNK_DURATION", "3.0"))
 SILENCE_THRESHOLD = float(os.getenv("SILENCE_THRESHOLD", "0.01"))
@@ -399,6 +403,86 @@ class WhisperTranscriber:
         except Exception as e:
             logger.error(f"Error transcribing audio: {e}")
             return None
+
+
+class ParakeetTranscriber:
+    """Transcribes audio using NVIDIA Parakeet-TDT"""
+
+    # Common hallucinations (similar to Whisper)
+    HALLUCINATION_PHRASES = {
+        "thank you.", "thank you", "thanks for watching", "thanks for watching!",
+        "bye.", "bye", "goodbye", "you", ".", ""
+    }
+
+    def __init__(self, model_name=PARAKEET_MODEL):
+        logger.info(f"Loading Parakeet model '{model_name}'...")
+        try:
+            # Import here to avoid requiring it if not used
+            import nemo.collections.asr as nemo_asr
+
+            logger.info("Note: On first run, Parakeet will automatically download model files from HuggingFace")
+            logger.info("This is a one-time download (~600MB) and may take several minutes")
+
+            self.model = nemo_asr.models.ASRModel.from_pretrained(model_name=model_name)
+
+            # Set model to eval mode
+            self.model.eval()
+
+            logger.info("Parakeet model loaded successfully")
+        except ImportError as e:
+            logger.error(f"Failed to import NeMo ASR. Install with: pip install -r requirements-parakeet.txt")
+            logger.error(f"Error: {e}")
+            raise
+        except Exception as e:
+            logger.error(f"Failed to load Parakeet model: {e}")
+            raise
+
+    def transcribe(self, audio_data):
+        """Transcribe audio data"""
+        try:
+            # Parakeet expects audio in float32 format at 16kHz (already provided)
+            # NeMo ASR models expect numpy arrays
+            if not isinstance(audio_data, np.ndarray):
+                audio_data = np.array(audio_data, dtype=np.float32)
+
+            # Ensure float32
+            if audio_data.dtype != np.float32:
+                audio_data = audio_data.astype(np.float32)
+
+            # Transcribe using NeMo's transcribe method
+            # Pass as list of numpy arrays
+            transcriptions = self.model.transcribe([audio_data])
+
+            # Get the text (transcribe returns list of transcriptions)
+            if not transcriptions or len(transcriptions) == 0:
+                return None
+
+            text = transcriptions[0].strip()
+
+            # Filter out empty transcriptions
+            if not text:
+                return None
+
+            # Filter out common hallucinations
+            if text.lower() in self.HALLUCINATION_PHRASES:
+                logger.debug(f"Filtered hallucination: '{text}'")
+                return None
+
+            return text
+
+        except Exception as e:
+            logger.error(f"Error transcribing audio with Parakeet: {e}")
+            return None
+
+
+def create_transcriber():
+    """Factory function to create appropriate transcriber based on configuration"""
+    if STT_SERVICE == "parakeet":
+        logger.info("Using Parakeet TDT speech-to-text service")
+        return ParakeetTranscriber()
+    else:
+        logger.info("Using Whisper speech-to-text service")
+        return WhisperTranscriber()
 
 
 class SpeakerbotClient:
@@ -827,10 +911,10 @@ def create_tts_client(audio_player=None):
 
 class SpeechToTextApp:
     """Main application class"""
-    
+
     def __init__(self):
         self.recorder = AudioRecorder()
-        self.transcriber = WhisperTranscriber()
+        self.transcriber = create_transcriber()
         self.audio_player = None
         self.client = None
         self.running = False

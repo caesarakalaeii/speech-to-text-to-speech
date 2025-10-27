@@ -232,6 +232,36 @@ def install_base_requirements():
         return response == 'y'
 
 
+def ask_stt_service():
+    """Ask user which STT (Speech-to-Text) service they want to install"""
+    print_header("STT (Speech-to-Text) Service Selection")
+
+    print("This project supports multiple speech-to-text options:")
+    print("")
+    print("1. Whisper (default, well-established):")
+    print("   • OpenAI's Whisper model")
+    print("   • Well-tested and reliable")
+    print("   • Multiple model sizes (tiny to large)")
+    print("   • Good accuracy")
+    print("   • ~1-10GB depending on model size")
+    print("")
+    print("2. Parakeet (NVIDIA, faster):")
+    print("   • NVIDIA Parakeet-TDT model")
+    print("   • Ultra-fast transcription (60min audio/sec)")
+    print("   • Multilingual (25 European languages)")
+    print("   • Automatic language detection")
+    print("   • Requires PyTorch + NeMo (~2-3GB)")
+    print("   • Best with GPU but works on CPU")
+    print("")
+
+    while True:
+        print("Which STT service would you like to install?")
+        response = input("Enter 1 (Whisper) or 2 (Parakeet): ").strip()
+        if response in ['1', '2']:
+            return response
+        print("Please enter 1 or 2")
+
+
 def ask_tts_service():
     """Ask user which TTS service they want to install"""
     print_header("TTS (Text-to-Speech) Service Selection")
@@ -413,6 +443,104 @@ def install_neutts_requirements():
     return True
 
 
+def install_parakeet_requirements():
+    """Install Parakeet TDT requirements"""
+    print_step("Installing Parakeet TDT requirements...")
+    pip_path = get_venv_pip()
+    python_path = get_venv_python()
+
+    print("This will install:")
+    print("  - PyTorch (deep learning framework)")
+    print("  - NeMo toolkit with ASR support")
+    print("  - And other dependencies...")
+    print("\nThis may take several minutes and download ~2-3GB of packages.")
+    print("")
+
+    # Check if CUDA is available (reuse logic from NeuTTS)
+    system = platform.system()
+    cuda_available = False
+
+    if system == "Windows":
+        cuda_available = os.path.exists("C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA") or \
+                        os.path.exists("C:\\ProgramData\\chocolatey\\lib\\cuda")
+
+    # Install PyTorch first with proper error handling
+    torch_installed = False
+
+    if cuda_available:
+        print("✓ CUDA detected - installing PyTorch 2.4.1 with GPU support")
+        print("  Using CUDA 12.1 index: https://download.pytorch.org/whl/cu121")
+        print("")
+
+        success, stdout, stderr = run_command(
+            f'"{pip_path}" install torch==2.4.1 torchaudio==2.4.1 --extra-index-url https://download.pytorch.org/whl/cu121',
+            check=False
+        )
+
+        if success:
+            print("✓ PyTorch with CUDA support installed successfully")
+            torch_installed = True
+        else:
+            print("⚠ Failed to install PyTorch with CUDA support")
+            print(f"  Error: {stderr[:200]}")
+            print("  Falling back to CPU version...")
+
+    if not torch_installed:
+        print("ℹ Installing PyTorch 2.4.1 (CPU version)")
+        print("  Using CPU index: https://download.pytorch.org/whl/cpu")
+        print("")
+
+        success, stdout, stderr = run_command(
+            f'"{pip_path}" install torch==2.4.1 torchaudio==2.4.1 --extra-index-url https://download.pytorch.org/whl/cpu',
+            check=False
+        )
+
+        if not success:
+            print("✗ Failed to install PyTorch (CPU version)")
+            print(f"  Error: {stderr[:200]}")
+            print("\nYou may need to install PyTorch manually:")
+            print("Visit: https://pytorch.org/get-started/locally/")
+            print("\nFor CPU-only (no GPU):")
+            print(f'  "{pip_path}" install torch==2.4.1 torchaudio==2.4.1 --extra-index-url https://download.pytorch.org/whl/cpu')
+            print("\nFor NVIDIA GPU (CUDA 12.1):")
+            print(f'  "{pip_path}" install torch==2.4.1 torchaudio==2.4.1 --extra-index-url https://download.pytorch.org/whl/cu121')
+            response = input("\nContinue with remaining packages? (y/n): ").strip().lower()
+            if response != 'y':
+                return False
+        else:
+            print("✓ PyTorch (CPU version) installed successfully")
+            torch_installed = True
+
+    # Verify PyTorch installation
+    if torch_installed:
+        print("\nℹ Verifying PyTorch installation...")
+        success, stdout, stderr = run_command(
+            f'"{python_path}" -c "import torch; print(f\'PyTorch {{torch.__version__}}\'); print(f\'CUDA available: {{torch.cuda.is_available()}}\')"',
+            check=False
+        )
+        if success:
+            print("✓ PyTorch verification:")
+            for line in stdout.strip().split('\n'):
+                print(f"  {line}")
+        else:
+            print("⚠ Could not verify PyTorch installation")
+
+    # Install Parakeet/NeMo dependencies
+    print("\nℹ Installing NeMo toolkit with ASR support...")
+    success, stdout, stderr = run_command(f'"{pip_path}" install -r requirements-parakeet.txt', check=False)
+
+    if success:
+        print("✓ Parakeet requirements installed successfully")
+        print("\n📝 NOTE: The Parakeet model (~600MB) will be downloaded automatically on first use")
+        print("   It will be cached in ~/.cache/huggingface/hub/")
+        return True
+    else:
+        print("⚠ Some Parakeet packages may have failed to install")
+        print(f"\nError details:\n{stderr[:500]}")
+        response = input("\nContinue anyway? (y/n): ").strip().lower()
+        return response == 'y'
+
+
 def install_piper_requirements():
     """Install Piper TTS requirements"""
     print_step("Installing Piper TTS requirements...")
@@ -533,13 +661,19 @@ def install_styletts2_requirements():
         return response == 'y'
 
 
-def setup_env_file(tts_choice):
+def setup_env_file(stt_choice, tts_choice):
     """Set up .env file from .env.example"""
     print_step("Setting up environment configuration...")
 
     env_exists = os.path.exists(".env")
 
     # Map choice to service name
+    stt_service_map = {
+        '1': 'whisper',
+        '2': 'parakeet'
+    }
+    stt_service = stt_service_map.get(stt_choice, 'whisper')
+
     tts_service_map = {
         '1': 'speakerbot',
         '2': 'piper',
@@ -559,13 +693,15 @@ def setup_env_file(tts_choice):
         shutil.copy(".env.example", ".env")
         print("✓ .env file created from .env.example")
 
-        # Update TTS_SERVICE based on installation choice
+        # Update STT_SERVICE and TTS_SERVICE based on installation choices
         try:
             with open(".env", "r") as f:
                 content = f.read()
+            content = content.replace("STT_SERVICE=whisper", f"STT_SERVICE={stt_service}")
             content = content.replace("TTS_SERVICE=speakerbot", f"TTS_SERVICE={tts_service}")
             with open(".env", "w") as f:
                 f.write(content)
+            print(f"✓ Set STT_SERVICE={stt_service} in .env")
             print(f"✓ Set TTS_SERVICE={tts_service} in .env")
         except Exception as e:
             print(f"⚠ Could not update .env automatically: {e}")
@@ -574,6 +710,16 @@ def setup_env_file(tts_choice):
         print("   Location: .env")
         print("\n⚠ You may need to edit .env for your setup:")
 
+        # STT configuration hints
+        if stt_service == 'parakeet':
+            print("\n   STT (Speech-to-Text) Settings:")
+            print("   - PARAKEET_MODEL: model name (default: nvidia/parakeet-tdt-0.6b-v3)")
+        else:  # whisper
+            print("\n   STT (Speech-to-Text) Settings:")
+            print("   - WHISPER_MODEL: tiny/base/small/medium/large (larger = more accurate but slower)")
+
+        # TTS configuration hints
+        print("\n   TTS (Text-to-Speech) Settings:")
         if tts_service == 'neutts':
             print("   - NEUTTS_REF_AUDIO: path to your reference audio (3-15 sec, .wav)")
             print("   - NEUTTS_REF_TEXT: path to transcription of reference audio")
@@ -588,15 +734,17 @@ def setup_env_file(tts_choice):
             print("   - SPEAKERBOT_WEBSOCKET_URL: your Speakerbot WebSocket URL")
             print("   - VOICE_NAME: the voice to use in Speakerbot")
 
-        print("   - WHISPER_MODEL: tiny/base/small/medium/large (larger = more accurate but slower)")
-
         return True
     else:
         print("⚠ .env.example not found, creating basic .env...")
         try:
             with open(".env", "w") as f:
+                f.write(f"STT_SERVICE={stt_service}\n")
+                if stt_service == 'whisper':
+                    f.write("WHISPER_MODEL=base\n")
+                else:
+                    f.write("PARAKEET_MODEL=nvidia/parakeet-tdt-0.6b-v3\n")
                 f.write(f"TTS_SERVICE={tts_service}\n")
-                f.write("WHISPER_MODEL=base\n")
                 if tts_service == 'neutts':
                     f.write("NEUTTS_BACKBONE=neuphonic/neutts-air-q4-gguf\n")
                     f.write("NEUTTS_BACKBONE_DEVICE=cpu\n")
@@ -735,6 +883,21 @@ def main():
         if response != 'y':
             sys.exit(1)
 
+    # Ask about STT service
+    stt_choice = ask_stt_service()
+
+    # Install STT-specific dependencies
+    stt_installed = True
+    if stt_choice == '1':
+        print("\n✓ Whisper selected - no additional dependencies needed (already in base)")
+    elif stt_choice == '2':
+        print("\n✓ Installing Parakeet TDT...")
+        stt_installed = install_parakeet_requirements()
+
+    if not stt_installed:
+        print("\n⚠ STT installation encountered issues.")
+        print("You can reconfigure later by editing .env")
+
     # Ask about TTS service
     tts_choice = ask_tts_service()
 
@@ -757,7 +920,7 @@ def main():
         print("You can reconfigure later by editing .env")
 
     # Setup .env file
-    setup_env_file(tts_choice)
+    setup_env_file(stt_choice, tts_choice)
 
     # Print next steps
     print_next_steps(tts_choice)

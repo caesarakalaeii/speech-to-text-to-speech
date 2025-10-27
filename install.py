@@ -245,7 +245,7 @@ def ask_stt_service():
     print("   • Good accuracy")
     print("   • ~1-10GB depending on model size")
     print("")
-    print("2. Parakeet (NVIDIA, faster):")
+    print("2. Parakeet (NVIDIA, ultra-fast):")
     print("   • NVIDIA Parakeet-TDT model")
     print("   • Ultra-fast transcription (60min audio/sec)")
     print("   • Multilingual (25 European languages)")

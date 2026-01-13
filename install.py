@@ -761,7 +761,7 @@ def setup_env_file(stt_choice, tts_choice):
             return False
 
 
-def print_next_steps(tts_choice):
+def print_next_steps(stt_choice, tts_choice):
     """Print next steps for the user"""
     print_header("Installation Complete!")
 
@@ -813,13 +813,23 @@ def print_next_steps(tts_choice):
         print("   - SPEAKERBOT_WEBSOCKET_URL=ws://localhost:8080")
         print("   - VOICE_NAME=your preferred voice")
 
-    print("\n   For Whisper (speech recognition):")
-    print("   - WHISPER_MODEL=base (or tiny/small/medium/large)")
-    print("     • tiny:   fastest, least accurate (~1GB RAM)")
-    print("     • base:   balanced (default, ~1GB RAM)")
-    print("     • small:  good quality (~2GB RAM)")
-    print("     • medium: better quality (~5GB RAM)")
-    print("     • large:  best quality, slowest (~10GB RAM)")
+    # STT configuration section based on choice
+    if stt_choice == '2':  # Parakeet
+        print("\n   For Parakeet (speech recognition):")
+        print("   - STT_SERVICE=parakeet (already set)")
+        print("   - PARAKEET_MODEL=nvidia/parakeet-tdt-0.6b-v3 (default)")
+        print("     • Ultra-fast transcription (60min audio/sec)")
+        print("     • Multilingual (25 European languages)")
+        print("     • Automatic language detection")
+    else:  # Whisper (default)
+        print("\n   For Whisper (speech recognition):")
+        print("   - STT_SERVICE=whisper (already set)")
+        print("   - WHISPER_MODEL=base (or tiny/small/medium/large)")
+        print("     • tiny:   fastest, least accurate (~1GB RAM)")
+        print("     • base:   balanced (default, ~1GB RAM)")
+        print("     • small:  good quality (~2GB RAM)")
+        print("     • medium: better quality (~5GB RAM)")
+        print("     • large:  best quality, slowest (~10GB RAM)")
 
     print("\n3️⃣  Run the application:")
     if system == "Windows":
@@ -924,7 +934,7 @@ def main():
     setup_env_file(stt_choice, tts_choice)
 
     # Print next steps
-    print_next_steps(tts_choice)
+    print_next_steps(stt_choice, tts_choice)
 
 
 if __name__ == "__main__":

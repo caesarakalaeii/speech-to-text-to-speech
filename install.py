@@ -887,7 +887,8 @@ def main():
     upgrade_pip()
     
     # Install base requirements
-    if not install_base_requirements():
+    base_requirements_successful = install_base_requirements()
+    if not base_requirements_successful:
         print("\n✗ Failed to install base requirements")
         response = input("Continue anyway? (y/n): ").strip().lower()
         if response != 'y':
@@ -900,7 +901,8 @@ def main():
     stt_setup_successful = True
     if stt_choice == '1':
         print("\n✓ Whisper selected - no additional dependencies needed (already in base requirements)")
-        # stt_setup_successful remains True, since base requirements were checked above
+        # Use base requirements status since Whisper depends on them
+        stt_setup_successful = base_requirements_successful
     elif stt_choice == '2':
         print("\n✓ Installing Parakeet TDT...")
         stt_setup_successful = install_parakeet_requirements()

@@ -12,13 +12,19 @@ uv run pytest
 
 ```bash
 nix flake check   # 57 unit tests, hermetic; e2e skip
-nix develop       # shell with python 3.13 + deps + uv; then: pytest
+nix develop       # python 3.13 + every dep + pytest + uv; then: pytest
+nix run .#        # the GUI, after `nix run .# -- setup`
 ```
 
 `nix flake check` is a real gate — it exits non-zero on a failing test. It runs
-the unit tests only, because `kokoro-onnx` and `espeakng-loader` are not
-packaged in nixpkgs and the e2e tests need the downloaded models regardless.
-Reach for `uv` inside `nix develop` when you need the synthesiser.
+the unit tests only, because a build sandbox should not download 870 MB of
+models; run `pytest` inside `nix develop` after `setup` to get all 65.
+
+`kokoro-onnx`, `phonemizer-fork` and `espeakng-loader` are not in nixpkgs, so
+the flake builds them. `espeakng-loader` is a shim over nixpkgs' `espeak-ng`
+instead of the vendored library in the upstream wheel — if you bump it, keep
+`get_library_path()` and `get_data_path()` as the only API, since that is all
+`stts.tts` calls.
 
 ## Ground rules
 

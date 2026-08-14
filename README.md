@@ -153,18 +153,34 @@ uv run stts            # open the GUI
 uv run pytest          # 65 tests
 ```
 
-With Nix, `nix flake check` runs the 57 unit tests hermetically, and
-`nix develop` gives a shell where `pytest` works without `uv sync`:
+### With Nix
+
+The flake covers the whole thing — running the app included, not just the tests:
 
 ```bash
-nix flake check   # 57 passed, 8 skipped
-nix develop       # then: pytest
+nix flake check         # 57 unit tests, hermetic, exits non-zero on failure
+nix run .# -- doctor    # check the environment
+nix run .# -- setup     # download the ~870 MB of models
+nix run .#              # open the GUI
+nix develop             # same deps + pytest + uv, for hacking
 ```
 
-The flake pins Python 3.13 (pyproject caps at `<3.14`). It cannot cover the e2e
-tests: `kokoro-onnx` and `espeakng-loader` are not in nixpkgs, and those tests
-need the models anyway — use the `uv` route above for that. `uv` is on the
-`nix develop` PATH for exactly that purpose.
+It pins Python 3.13 to match `.python-version`. `kokoro-onnx`, `phonemizer-fork`
+and `espeakng-loader` are not in nixpkgs, so the flake builds them: the first
+two from their PyPI wheels, and `espeakng-loader` as a shim pointing at
+nixpkgs' `espeak-ng` rather than the vendored binary in the upstream wheel.
+
+`nix flake check` deliberately runs only the unit tests — a build sandbox has no
+business downloading 870 MB. Once `setup` has run, `nix develop` then `pytest`
+executes all 65.
+
+### Running it on Linux
+
+It works, with one gap: the virtual-microphone helper is Windows-only
+(VB-CABLE). To feed OBS or Discord on Linux, make a PipeWire null sink and
+select it as the output device — the app says as much if you click the button.
+Everything else (capture, recognition, synthesis, monitoring) is
+platform-independent. `stts devices` lists what it can see.
 
 Other commands: `stts doctor` (environment check), `stts devices` (list audio
 devices), `stts bench [--gpu]` (measure recogniser and synthesiser latency).

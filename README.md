@@ -1,339 +1,171 @@
-# speech-to-text-to-speech
+# VoiceMask
 
-Simple locally hosted speech-to-text-to-speech application inspired by Zentreya's TTS setup. Supports multiple STT engines (Whisper, Parakeet) and TTS services (Speakerbot, NeuTTS, Piper, StyleTTS2).
+**Your voice goes in. A different voice comes out. Nothing leaves your PC.**
 
-## Features
+VoiceMask listens to your microphone, works out what you said, and says it
+again in a voice you pick. Your real voice is never transmitted — not to your
+stream, not to Discord, not to a server. It is discarded the instant it has
+been read.
 
-- 🎤 Real-time audio capture from microphone
-- 🧠 **Multiple STT options:** OpenAI Whisper or NVIDIA Parakeet-TDT (ultra-fast, multilingual)
-- 🔌 **Multiple TTS options:** Speakerbot WebSocket, NeuTTS Air, Piper, or StyleTTS2
-- 🎭 Voice cloning support with NeuTTS Air and StyleTTS2
-- 🔊 Queue-based audio playback with output device selection (local TTS)
-- ⚙️ Configurable via environment variables
-- 🐳 Docker support with GPU passthrough
-- 🚀 Easy setup with automated installation scripts
+Built for streamers who want to talk to chat in real time without their voice
+being identifiable.
 
-## 📚 Tutorials
+---
 
-**For Non-Technical Users:**
-- 🆕 **[Windows Setup Guide](WINDOWS_SETUP.md)** - **RECOMMENDED** - Complete automated setup with one-click installation of all dependencies (Python, FFmpeg, CUDA, espeak-ng)
-- [Windows Setup Guide with Local NeuTTS (FREE, Offline)](WINDOWS_NEUTTS_LOCAL_TTS_TUTORIAL.md) - Alternative beginner-friendly guide for manual setup with local text-to-speech and voice cloning
-- [Windows Setup Guide with Google Cloud TTS and Streamer Bot](WINDOWS_GOOGLE_CLOUD_TTS_STREAMER_BOT_TUTORIAL.md) - Comprehensive guide for cloud-based TTS with Streamer Bot integration
+## Install (Windows)
 
-## Requirements
+1. Download this project as a ZIP and extract it somewhere sensible
+   (`C:\VoiceMask` is ideal — avoid deeply nested folders).
+2. Double-click **`Install.bat`**.
+3. Wait about 10 minutes. It sets up everything, including Python.
+4. Open **VoiceMask** from the desktop shortcut.
 
-- Python 3.8 or higher
-- PortAudio (for microphone input)
-- FFmpeg (for Whisper audio processing)
-- CUDA-capable GPU (optional, but recommended for better performance)
+You do not need Python, a compiler, CUDA, or administrator rights.
 
-## Quick Start
+### Getting it into OBS or Discord
 
-> 🚀 **New!** Automated Windows installer now available! See [INSTALL_GUIDE.md](INSTALL_GUIDE.md) for all installation options.
+For other apps to hear the new voice, it has to look like a microphone. That
+needs a free virtual audio cable driver. VoiceMask detects whether you have one
+and offers to set it up — click **"Set up virtual microphone…"** in the app.
 
-### Windows (Recommended Methods)
+Once installed:
 
-#### Method 1: Fully Automated Setup ⭐ (Easiest)
+| In VoiceMask | Set to |
+|---|---|
+| Microphone | your real mic |
+| Voice goes to | **CABLE Input** |
+| Also hear it on | your headphones *(optional)* |
 
-Automatically installs **everything** including Python, FFmpeg, CUDA, and espeak-ng:
+| In OBS / Discord / browser | Set to |
+|---|---|
+| Microphone | **CABLE Output** |
 
-1. Clone or download this repository
-2. **Right-click `setup.bat`** → Select **"Run as Administrator"**
-3. Follow the prompts (takes 20-30 minutes)
-4. Edit `.env` file to configure
-5. Run `run.bat`
+Now every app hears only the masked voice.
 
-📖 **Full guide:** [WINDOWS_SETUP.md](WINDOWS_SETUP.md)
+---
 
-#### Method 2: Quick Setup (If you have Python)
+## How fast is it?
 
-If you already have Python 3.8+ installed:
+The request was "ideally under 50 ms". **That is not physically possible for
+this kind of tool, and no model choice changes it** — you cannot say a word
+before you know which word it is, and you cannot know that until the speaker
+has finished saying it. An English word takes 300–400 ms to say.
 
-1. Clone the repository
-2. Double-click `install.bat`
-3. Edit `.env` file
-4. Run `run.bat`
+What VoiceMask actually does, measured end to end on hardware *slower* than the
+target machine:
 
-*Note: Requires FFmpeg and espeak-ng to be installed separately*
+| Situation | Delay before chat hears you |
+|---|---|
+| Talking continuously | **~0 ms** — the new voice is already speaking when you stop |
+| One short isolated phrase | **under 1 second** |
 
-#### Method 3: Check Your System First
+It gets there by transcribing *while you are still talking* and speaking the
+part of the sentence it is already sure about. Details and measurements:
+[ADR 5](docs/adr/0005-latency-budget.md).
 
-Not sure what you need? Run the system check:
+If you genuinely need sub-50 ms, the only option is direct voice conversion
+(RVC and similar), which changes how your voice *sounds* but keeps your accent,
+rhythm, laughter and speech habits intact. That is a much weaker privacy
+guarantee, which is why VoiceMask does not use it.
 
-1. Double-click `check-system.bat`
-2. See what's installed and get recommendations
-3. Follow the suggested installation method
+---
 
-### Linux/macOS
+## What's under the hood
 
-#### Automated Setup Scripts (Recommended)
+Everything runs locally on ONNX Runtime. No PyTorch, no CUDA, no ROCm, no
+FFmpeg, no system packages.
 
-1. Clone the repository:
-```bash
-git clone https://github.com/caesarakalaeii/speech-to-text-to-speech.git
-cd speech-to-text-to-speech
+| Stage | Model | Why |
+|---|---|---|
+| Voice detection | Silero VAD v5 | 2 MB, decides when you started and stopped |
+| Recognition | Parakeet TDT 0.6B v2 | ~190 ms per phrase, 3× faster and more accurate than Whisper base |
+| Synthesis | Kokoro-82M (fp16) | 24 English voices in one 178 MB file, Apache-2.0 |
+| Fallback | Piper | ~10× faster, more robotic — optional |
+
+Measured on an i7-11700K, which is slower than the Ryzen 7 7800X3D this was
+built for:
+
+```
+Parakeet TDT 0.6B v2    2.4 s of speech -> 190 ms   (Whisper base: 596 ms)
+Kokoro-82M fp16         2.4 s of audio  -> 425 ms   (RTF 0.18)
 ```
 
-2. Run the setup script:
-```bash
-chmod +x setup.sh
-./setup.sh
-```
+**The GPU is not used by default.** On an AMD card on Windows, CPU is fast
+enough, more reliable, and leaves the GPU free for the game you are streaming.
+`Enable-GPU.bat` will try DirectML and benchmark it if you want to compare;
+`Disable-GPU.bat` reverses it. Reasoning:
+[ADR 2](docs/adr/0002-onnx-runtime-only.md).
 
-3. Configure your settings:
-```bash
-# Edit .env to set your TTS service and configuration
-nano .env
-```
+---
 
-4. Run the application:
-```bash
-source venv/bin/activate
-python main.py
-```
+## If something goes wrong
 
-### Method 2: Docker Setup (with GPU support)
+Run **`Report-Problem.bat`**. It writes `voicemask-report.txt` to your desktop
+with everything needed to diagnose it.
 
-1. Build and run with Docker Compose:
-```bash
-docker-compose up --build
-```
+| Problem | Fix |
+|---|---|
+| Chat still hears my real voice | The app is still set as your mic somewhere. Set every app to **CABLE Output**. |
+| It cuts me off mid-sentence | Raise **Response delay** in the app. |
+| It repeats or garbles words | Lower **Response delay**, or move the mic closer. |
+| It talks when I am silent | Your mic is picking up background noise; raise the mic threshold in `settings.json`. |
+| Nothing happens at all | Check the mic level meter moves when you speak. |
 
-For GPU support, ensure you have:
-- NVIDIA Docker runtime installed
-- Compatible NVIDIA drivers
+Settings, logs and models live in `%LOCALAPPDATA%\VoiceMask`.
 
-## Configuration
+---
 
-Edit the `.env` file to customize settings:
-
-```bash
-# STT Service: whisper or parakeet
-STT_SERVICE=whisper
-
-# Whisper model size (if STT_SERVICE=whisper)
-WHISPER_MODEL=base
-
-# Parakeet model (if STT_SERVICE=parakeet)
-PARAKEET_MODEL=nvidia/parakeet-tdt-0.6b-v3
-
-# TTS Service: speakerbot, neutts, piper, or styletts2
-TTS_SERVICE=speakerbot
-
-# Speakerbot settings (if TTS_SERVICE=speakerbot)
-SPEAKERBOT_WEBSOCKET_URL=ws://localhost:8080
-VOICE_NAME=Sally
-
-# NeuTTS Air settings (if TTS_SERVICE=neutts)
-NEUTTS_BACKBONE=neuphonic/neutts-air-q4-gguf
-NEUTTS_BACKBONE_DEVICE=cpu
-NEUTTS_REF_AUDIO=samples/reference.wav
-NEUTTS_REF_TEXT=samples/reference.txt
-
-# Piper settings (if TTS_SERVICE=piper)
-PIPER_VOICE_PATH=
-
-# StyleTTS2 settings (if TTS_SERVICE=styletts2)
-STYLETTS2_REF_AUDIO=samples/reference.wav
-
-# Audio settings
-SAMPLE_RATE=16000
-CHUNK_DURATION=3.0
-SILENCE_THRESHOLD=0.01
-MIN_SPEECH_DURATION=0.5
-```
-
-### STT (Speech-to-Text) Service Options
-
-#### Whisper (Default)
-- OpenAI's Whisper speech recognition model
-- Well-established and reliable
-- Multiple model sizes available (tiny to large)
-- Set `STT_SERVICE=whisper` in `.env`
-- Included in base installation
-- Choose model size with `WHISPER_MODEL`:
-  - `tiny`: Fastest, least accurate (~1GB RAM)
-  - `base`: Good balance (~1GB RAM) - **Default**
-  - `small`: Better accuracy (~2GB RAM)
-  - `medium`: High accuracy (~5GB RAM)
-  - `large`: Best accuracy (~10GB RAM)
-
-#### Parakeet TDT
-- NVIDIA's Parakeet-TDT model - ultra-fast transcription
-- **Transcribes 60 minutes of audio per second**
-- Supports 25 European languages with automatic language detection
-- Set `STT_SERVICE=parakeet` in `.env`
-- Install dependencies: `pip install -r requirements-parakeet.txt`
-- Requires PyTorch (automatically configured for CPU or CUDA)
-- Model automatically downloads on first use (~600MB)
-- Best with GPU but works well on CPU
-
-### TTS Service Options
-
-#### Speakerbot (Default)
-- Connects to a local Speakerbot instance via WebSocket
-- Requires Speakerbot to be running locally
-- Set `TTS_SERVICE=speakerbot` in `.env`
-- Configure `SPEAKERBOT_WEBSOCKET_URL` and `VOICE_NAME`
-
-#### NeuTTS Air
-- Uses the locally-run NeuTTS Air neural TTS model (https://github.com/neuphonic/neutts-air)
-- Runs entirely on your device - no API calls or internet required
-- Supports instant voice cloning from a reference audio sample
-- **Queue-based audio playback**: Generated speech is played through a selected output device
-- **Output device selection**: GUI dialog allows you to choose your preferred audio output
-- Set `TTS_SERVICE=neutts` in `.env`
-- Install additional dependencies: `pip install -r requirements-neutts.txt`
-- Install espeak: `brew install espeak` (macOS) or `sudo apt install espeak` (Linux)
-- Configure reference audio and text files for voice cloning
-- Choose backbone model based on your device:
-  - `neuphonic/neutts-air-q4-gguf`: Recommended for most devices (with llama-cpp-python)
-  - `neuphonic/neutts-air-q8-gguf`: Better quality, more resources
-  - `neuphonic/neutts-air`: Full PyTorch model, highest quality but slowest
-
-#### Piper
-- Fast local TTS with ONNX models
-- Pre-trained voices only (no voice cloning)
-- Very lightweight and runs efficiently on CPU
-- Set `TTS_SERVICE=piper` in `.env`
-- Install dependencies: `pip install -r requirements-piper.txt`
-- Voice models auto-download on first use or download from HuggingFace
-
-#### StyleTTS2
-- Modern neural TTS with voice cloning
-- Clone voices from 3-15 second audio samples
-- Set `TTS_SERVICE=styletts2` in `.env`
-- Install dependencies: `pip install -r requirements-styletts2.txt`
-- Requires PyTorch
-- Optional reference audio for voice cloning
-
-## Manual Installation
-
-If you prefer manual installation:
-
-### Windows
-
-```cmd
-REM Install ffmpeg (using Chocolatey or Scoop)
-choco install ffmpeg
-REM OR: scoop install ffmpeg
-REM OR download from: https://www.gyan.dev/ffmpeg/builds/
-
-REM Create virtual environment
-python -m venv venv
-venv\Scripts\activate.bat
-
-REM Install Python dependencies
-pip install -r requirements.txt
-
-REM Note: If PyAudio installation fails, download a pre-built wheel from:
-REM https://www.lfd.uci.edu/~gohlke/pythonlibs/#pyaudio
-REM Then install with: pip install PyAudio-X.X.X-cpXX-cpXX-win_amd64.whl
-
-REM Copy and configure environment
-copy .env.example .env
-notepad .env
-```
-
-### Linux/Ubuntu
+## For developers
 
 ```bash
-# Install system dependencies
-sudo apt-get update
-sudo apt-get install -y python3 python3-pip portaudio19-dev ffmpeg
-
-# Create virtual environment
-python3 -m venv venv
-source venv/bin/activate
-
-# Install Python dependencies
-pip install -r requirements.txt
-
-# Copy and configure environment
-cp .env.example .env
-nano .env
+uv sync --group dev        # set up
+uv run voicemask setup     # download the ~870 MB of models
+uv run voicemask           # open the GUI
+uv run pytest              # 60 tests
 ```
 
-### macOS
+Other commands: `voicemask doctor` (environment check), `voicemask devices`
+(list audio devices), `voicemask bench [--gpu]` (measure latency).
 
-```bash
-# Install system dependencies
-brew install portaudio ffmpeg
+### Layout
 
-# Create virtual environment
-python3 -m venv venv
-source venv/bin/activate
-
-# Install Python dependencies
-pip install -r requirements.txt
-
-# Copy and configure environment
-cp .env.example .env
-nano .env
+```
+voicemask/
+  pipeline.py     orchestration: capture -> VAD -> recognise -> synthesise -> play
+  segmenter.py    endpointing state machine (pure logic, no models)
+  text.py         hallucination filter, LocalAgreement, sentence chunking
+  vad.py          streaming Silero wrapper
+  stt.py          Parakeet via onnx-asr
+  tts.py          Kokoro, plus the router that dispatches per voice
+  audio/          device enumeration, capture, playback, resampling
+  gui.py          Tkinter front end
+  paths.py        app dirs + the espeak-ng path-length guard
 ```
 
-## Usage
+`pytest` runs 52 unit tests with no models needed, plus 8 end-to-end tests that
+load the real models, synthesise speech, push it through the whole pipeline and
+check the words survive the round trip. The e2e tests skip themselves if the
+models are not downloaded.
 
-Once running, the application will:
+Architecture decisions, with the measurements behind them, are in
+[`docs/adr/`](docs/adr/). Changing a model, the runtime, the latency strategy
+or the installer needs a new one.
 
-1. Start listening to your microphone
-2. Detect speech segments based on audio energy
-3. Transcribe speech using Whisper
-4. Generate speech using your configured TTS service (Speakerbot or NeuTTS Air)
+---
 
-Press `Ctrl+C` to stop the application.
+## Privacy
 
-## Troubleshooting
+Everything is local. There is no network traffic after the one-time model
+download, no telemetry, and no audio written to disk. The transcript exists
+only in memory and in the app window.
 
-### No audio input detected
+Your real voice is never sent anywhere — but note that VoiceMask masks *voice*,
+not *content*. It will faithfully repeat anything identifying that you say out
+loud.
 
-- Check microphone permissions
-- Verify microphone is selected as default input device
-- Adjust `SILENCE_THRESHOLD` in `.env` (lower = more sensitive)
-- **Windows**: Check Privacy Settings > Microphone and ensure apps have access
+## Licence
 
-### High CPU usage
-
-- Use a smaller Whisper model (`tiny` or `base`)
-- Increase `CHUNK_DURATION` to process less frequently
-
-### TTS service connection fails
-
-**For Speakerbot:**
-- Verify Speakerbot is running
-- Check `SPEAKERBOT_WEBSOCKET_URL` in `.env`
-- Ensure firewall allows WebSocket connections
-
-**For NeuTTS Air:**
-- Verify you installed dependencies: `pip install -r requirements-neutts.txt`
-- Check espeak is installed (`brew install espeak` or `sudo apt install espeak`)
-- Verify reference audio and text files exist and are in correct format
-- Check that backbone model is downloaded (happens automatically on first run)
-- Ensure sufficient RAM/VRAM for the model (Q4 GGUF needs ~2GB)
-
-### PyAudio installation fails on Windows
-
-- Install Microsoft C++ Build Tools from: https://visualstudio.microsoft.com/visual-cpp-build-tools/
-- OR download a pre-built PyAudio wheel from: https://www.lfd.uci.edu/~gohlke/pythonlibs/#pyaudio
-- Install the wheel with: `pip install PyAudio-X.X.X-cpXX-cpXX-win_amd64.whl`
-
-### FFmpeg not found on Windows
-
-- Install using Chocolatey: `choco install ffmpeg`
-- OR install using Scoop: `scoop install ffmpeg`
-- OR download from https://www.gyan.dev/ffmpeg/builds/ and add to PATH
-
-### CUDA/GPU errors with Docker
-
-- Ensure NVIDIA Docker runtime is installed
-- Check GPU drivers are up to date
-- Remove GPU configuration from `docker-compose.yml` to run on CPU
-
-## License
-
-This project is licensed under the GNU Affero General Public License v3.0 - see the [LICENSE](LICENSE) file for details.
-
-## Acknowledgments
-
-- OpenAI Whisper for speech recognition
-- Inspired by Zentreya's TTS setup
+MIT — see [LICENSE](LICENSE). Models carry their own licences: Kokoro-82M
+(Apache-2.0), Parakeet TDT (CC-BY-4.0), Silero VAD (MIT), Piper voices (MIT).
+VB-CABLE is third-party donationware from VB-Audio, downloaded from them
+directly and not redistributed here.

@@ -56,6 +56,9 @@ and costs accuracy headroom for a saving that only matters on disk.
   `models.STT_MODEL` gets 25 languages at a small English accuracy cost, if
   that is ever wanted.
 - ~660 MB one-time download, cached by `huggingface_hub`.
+- The timings above are this machine only. Per-machine measurements collected
+  since are in [BENCHMARKS.md](../BENCHMARKS.md), and they vary by more than an
+  order of magnitude.
 - The model is non-streaming: it transcribes a complete buffer. We get
   streaming behaviour by re-running it on a growing buffer and reconciling the
   results (ADR 5), which is affordable precisely because a pass is ~200 ms.

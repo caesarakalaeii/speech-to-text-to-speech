@@ -63,6 +63,10 @@ Piper is kept as a fast, lower-quality fallback.
 - Output is 24 kHz mono, resampled to whatever the output device wants.
 - `kokoro-onnx` phonemises through espeak-ng, which brings the path-length
   problem documented in `stts/paths.py` and ADR 6.
+- RTF ~0.18 holds on this machine and cannot be assumed elsewhere: a Ryzen 7
+  PRO 5850U laptop measures ~1.75, i.e. slower than real time, which breaks the
+  overlap ADR 5 depends on. Per-machine numbers:
+  [BENCHMARKS.md](../BENCHMARKS.md).
 - RTF ~0.18 means synthesis is the dominant cost in the pipeline. Splitting
   text into sentence-sized chunks so playback overlaps generation (ADR 5) is
   what keeps that off the critical path.

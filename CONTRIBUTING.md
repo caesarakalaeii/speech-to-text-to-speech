@@ -38,6 +38,11 @@ instead of the vendored library in the upstream wheel — if you bump it, keep
   best-looking case, and both the README and an ADR repeated it as if it had
   been measured — see [ADR 5](docs/adr/0005-latency-budget.md). Say which tool
   produced a figure and on what hardware, or leave it out.
+- **Record what you measure.** New timings go in
+  [docs/BENCHMARKS.md](docs/BENCHMARKS.md) with the CPU, the onnxruntime source
+  and version, and the execution provider. Performance here varies by more than
+  an order of magnitude between machines, so a number without its context is
+  not usable by anyone else.
 - **Architectural changes need an ADR.** Swapping a model, the inference
   runtime, the latency strategy or the installer means a new file in
   `docs/adr/`. Tuning a default or adding a voice does not.

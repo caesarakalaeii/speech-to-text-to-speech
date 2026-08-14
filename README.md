@@ -112,7 +112,13 @@ not end-to-end delay — `bench` runs the recogniser and synthesiser directly an
 skips voice detection, endpointing, streaming and playback. And they are the
 figures recorded in [ADR 3](docs/adr/0003-speech-recognition-model.md) and
 [ADR 4](docs/adr/0004-speech-synthesis-model.md) when those decisions were
-made; re-run `stts bench` to see what your own machine does.
+made.
+
+**Your machine may be far slower, and it matters.** On a Ryzen 7 PRO 5850U
+laptop, synthesis runs at RTF ~1.75 — slower than real time, which means the
+pipeline can never catch up and none of the latency figures above hold. Run
+`stts bench` before trusting them, and add your result to
+[docs/BENCHMARKS.md](docs/BENCHMARKS.md), which collects per-machine numbers.
 
 On accuracy, Parakeet is chosen on its published word error rate, not on a
 measurement here — in our own comparison Whisper base and Parakeet both

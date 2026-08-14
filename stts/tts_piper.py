@@ -1,12 +1,16 @@
 """Piper synthesis -- the fast, lower-quality fallback.
 
-Piper is roughly ten times faster than Kokoro and each voice is a ~60 MB ONNX
-file, but it sounds distinctly more synthetic. It earns its place for two
-situations: a machine too slow for Kokoro to keep up, and as something that
-still works if the Kokoro model or its phonemiser fails to load.
+Piper is substantially faster than Kokoro and each voice is a ~60 MB ONNX file,
+but it sounds distinctly more synthetic. It earns its place for two situations:
+a machine too slow for Kokoro to keep up, and as something that still works if
+the Kokoro model or its phonemiser fails to load.
 
-Installed on demand -- `pip install voicemask[piper]` -- so the default install
-does not carry it.
+Note that the speed gap has not been benchmarked in this project -- `stts bench`
+only exercises Kokoro -- so no ratio is quoted here or in the README. If that
+number is ever needed, measure it and record it in ADR 4.
+
+Installed on demand -- `pip install speech-to-text-to-speech[piper]` -- so the
+default install does not carry it.
 """
 
 from __future__ import annotations

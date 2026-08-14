@@ -1,6 +1,6 @@
 import pytest
 
-from voicemask.text import (
+from stts.text import (
     LocalAgreement,
     clean,
     is_hallucination,
@@ -141,14 +141,14 @@ class TestLocalAgreement:
 
 class TestSpeechBuffer:
     def test_holds_text_until_a_sentence_closes(self):
-        from voicemask.text import SpeechBuffer
+        from stts.text import SpeechBuffer
 
         buf = SpeechBuffer()
         assert buf.add("hey chat welcome") == []
         assert buf.add("back to the stream.") == ["hey chat welcome back to the stream."]
 
     def test_releases_multiple_sentences_at_once(self):
-        from voicemask.text import SpeechBuffer
+        from stts.text import SpeechBuffer
 
         buf = SpeechBuffer()
         out = buf.add("First one is here. Second one is here too. And a third")
@@ -156,7 +156,7 @@ class TestSpeechBuffer:
         assert buf.pending == "And a third"
 
     def test_run_on_speech_is_released_at_a_clause_boundary(self):
-        from voicemask.text import SpeechBuffer
+        from stts.text import SpeechBuffer
 
         buf = SpeechBuffer(max_chars=60)
         out = buf.add(
@@ -167,7 +167,7 @@ class TestSpeechBuffer:
         assert out[0].endswith(",")
 
     def test_flush_returns_everything_left(self):
-        from voicemask.text import SpeechBuffer
+        from stts.text import SpeechBuffer
 
         buf = SpeechBuffer()
         buf.add("no punctuation here")
@@ -175,12 +175,12 @@ class TestSpeechBuffer:
         assert buf.pending == ""
 
     def test_flush_on_empty_buffer(self):
-        from voicemask.text import SpeechBuffer
+        from stts.text import SpeechBuffer
 
         assert SpeechBuffer().flush() == []
 
     def test_no_words_are_lost_across_add_and_flush(self):
-        from voicemask.text import SpeechBuffer
+        from stts.text import SpeechBuffer
 
         buf = SpeechBuffer(max_chars=40)
         source = (
@@ -196,19 +196,19 @@ class TestSpeechBuffer:
 
 class TestVoiceCatalogue:
     def test_every_listed_voice_has_a_unique_display_name(self):
-        from voicemask import tts
+        from stts import tts
 
         displays = [v.display for v in tts.all_voices()]
         assert len(displays) == len(set(displays))
 
     def test_piper_voices_are_recognised_by_prefix(self):
-        from voicemask.tts_piper import PIPER_VOICES, is_piper_voice
+        from stts.tts_piper import PIPER_VOICES, is_piper_voice
 
         assert all(is_piper_voice(v.id) for v in PIPER_VOICES)
         assert not is_piper_voice("af_heart")
 
     def test_piper_voice_ids_map_to_huggingface_paths(self):
-        from voicemask.tts_piper import _remote_path
+        from stts.tts_piper import _remote_path
 
         assert _remote_path("en_US-amy-medium") == "en/en_US/amy/medium/en_US-amy-medium"
         assert _remote_path("en_GB-northern_english_male-medium") == (
@@ -216,14 +216,14 @@ class TestVoiceCatalogue:
         )
 
     def test_all_catalogue_voices_pass_settings_validation(self):
-        from voicemask import tts
-        from voicemask.config import Settings
+        from stts import tts
+        from stts.config import Settings
 
         for voice in tts.all_voices():
             assert Settings(voice=voice.id).validated().voice == voice.id
 
     def test_an_unknown_voice_falls_back_to_the_default(self):
-        from voicemask import tts
-        from voicemask.config import Settings
+        from stts import tts
+        from stts.config import Settings
 
         assert Settings(voice="nope").validated().voice == tts.DEFAULT_VOICE

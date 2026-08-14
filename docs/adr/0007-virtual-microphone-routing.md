@@ -12,8 +12,8 @@ The user is a streamer. Playing the masked voice out of a speaker accomplishes
 nothing -- OBS, Discord and the browser need it as a **microphone input**.
 
 On Windows that requires a virtual audio cable: a kernel driver exposing a
-playback endpoint whose audio reappears on a capture endpoint. VoiceMask
-writes to "CABLE Input"; OBS selects "CABLE Output" as its microphone.
+playback endpoint whose audio reappears on a capture endpoint. We write to
+"CABLE Input"; OBS selects "CABLE Output" as its microphone.
 
 v1 ignored this entirely. It played to a chosen output device and left the user
 to work out why their stream still had their real voice on it -- which, for

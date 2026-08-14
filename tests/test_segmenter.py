@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from voicemask.segmenter import (
+from stts.segmenter import (
     Endpointer,
     EndpointerConfig,
     Partial,
@@ -137,7 +137,7 @@ class TestPartials:
 
 
 def test_wrong_frame_size_is_rejected_by_the_vad_contract():
-    from voicemask import vad
+    from stts import vad
 
     assert vad.HOP == FRAME  # the endpointer default must match Silero's hop
 

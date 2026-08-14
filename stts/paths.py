@@ -1,4 +1,4 @@
-"""Where VoiceMask keeps its models, settings and logs.
+"""Where Speech-to-Text-to-Speech keeps its models, settings and logs.
 
 Also home to the espeak-ng path guard, which exists for a genuinely obscure
 reason: espeak-ng copies the data directory path into a fixed 160-byte buffer.
@@ -15,7 +15,7 @@ import os
 import shutil
 from pathlib import Path
 
-APP_NAME = "VoiceMask"
+APP_NAME = "stts"
 
 # espeak-ng's PATH_HOME buffer is 160 bytes. It appends "/espeak-ng-data"
 # (15) and then filenames such as "/phondata-manifest" (19) on top, so the
@@ -45,7 +45,7 @@ def settings_path() -> Path:
 
 
 def log_path() -> Path:
-    return data_dir() / "voicemask.log"
+    return data_dir() / "stts.log"
 
 
 def safe_espeak_data_path(raw_path: str | Path, staging: Path | None = None) -> str:
@@ -64,7 +64,7 @@ def safe_espeak_data_path(raw_path: str | Path, staging: Path | None = None) -> 
     if len(str(target)) > _ESPEAK_PATH_LIMIT:
         # Even the app dir is too deep (very unusual). Fall back to the
         # filesystem root, which is always short enough.
-        root = Path("C:/VoiceMask") if os.name == "nt" else Path("/tmp/voicemask")
+        root = Path("C:/stts") if os.name == "nt" else Path("/tmp/stts")
         root.mkdir(parents=True, exist_ok=True)
         target = root / "espeak-ng-data"
 

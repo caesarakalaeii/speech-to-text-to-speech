@@ -28,21 +28,21 @@ def _pythonw() -> Path:
 
 
 def create_shortcut() -> Path | None:
-    """Put a VoiceMask shortcut on the desktop. Windows only."""
+    """Put a Speech-to-Text-to-Speech shortcut on the desktop. Windows only."""
     if os.name != "nt":
         return None
 
     desktop = Path(os.path.expanduser("~")) / "Desktop"
     if not desktop.exists():
         return None
-    link = desktop / "VoiceMask.lnk"
+    link = desktop / "Speech-to-Text-to-Speech.lnk"
 
     script = (
         "$s = (New-Object -ComObject WScript.Shell).CreateShortcut('{link}');"
         "$s.TargetPath = '{target}';"
-        "$s.Arguments = '-m voicemask.cli';"
+        "$s.Arguments = '-m stts.cli';"
         "$s.WorkingDirectory = '{cwd}';"
-        "$s.Description = 'VoiceMask - real-time voice masking';"
+        "$s.Description = 'Speech-to-Text-to-Speech - real-time voice masking';"
         "$s.Save()"
     ).format(link=link, target=_pythonw(), cwd=project_root())
 
@@ -55,13 +55,13 @@ def create_shortcut() -> Path | None:
         )
     except (subprocess.SubprocessError, OSError) as exc:
         print(f"  Could not create the desktop shortcut ({exc}).")
-        print(f"  Start VoiceMask with: {project_root() / 'VoiceMask.bat'}")
+        print(f"  Start the app with: {project_root() / 'Start.bat'}")
         return None
     return link
 
 
 def main() -> int:
-    print("VoiceMask setup")
+    print("Speech-to-Text-to-Speech setup")
     print("=" * 46)
 
     needed = models.total_download_mb()
@@ -99,7 +99,7 @@ def main() -> int:
             print(
                 "\n  Note: no virtual microphone is installed yet.\n"
                 "  You need one for OBS or Discord to hear the new voice.\n"
-                "  VoiceMask will offer to set it up when you first open it."
+                "  The app will offer to set it up when you first open it."
             )
     except Exception:
         pass

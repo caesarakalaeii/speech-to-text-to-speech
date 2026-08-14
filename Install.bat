@@ -1,8 +1,8 @@
 @echo off
-title VoiceMask - Install
+title Speech-to-Text-to-Speech - Install
 cd /d "%~dp0"
 echo.
-echo   Installing VoiceMask. This takes about 10 minutes and needs internet.
+echo   Installing Speech-to-Text-to-Speech. This takes about 10 minutes and needs internet.
 echo   You do not need Python - it will be set up for you.
 echo.
 
@@ -15,16 +15,16 @@ if errorlevel 1 (
     set "PATH=%USERPROFILE%\.local\bin;%PATH%"
 )
 
-echo   [2/3] Installing VoiceMask...
+echo   [2/3] Installing Speech-to-Text-to-Speech...
 uv sync --no-dev
 if errorlevel 1 goto fail
 
 echo   [3/3] Downloading voices and models...
-uv run python -m voicemask.install
+uv run python -m stts.install
 if errorlevel 1 goto fail
 
 echo.
-echo   Done. Open VoiceMask from the desktop shortcut.
+echo   Done. Open Speech-to-Text-to-Speech from the desktop shortcut.
 pause
 exit /b 0
 

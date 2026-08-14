@@ -19,11 +19,11 @@ import time
 import numpy as np
 import pytest
 
-from voicemask import pipeline as pl
-from voicemask.audio.resample import resample
-from voicemask.config import Settings
-from voicemask.text import normalise_word
-from voicemask.vad import HOP, SAMPLE_RATE
+from stts import pipeline as pl
+from stts.audio.resample import resample
+from stts.config import Settings
+from stts.text import normalise_word
+from stts.vad import HOP, SAMPLE_RATE
 
 pytestmark = pytest.mark.models
 
@@ -93,6 +93,13 @@ class FakePlayer:
 
     @property
     def queued_s(self) -> float:
+        """Always 0: this sink swallows audio instantly rather than playing it.
+
+        Consequence for `test_response_latency_is_under_one_second`: the figure
+        it asserts on covers recognise + synthesise, but *not* the wait for
+        previously queued audio to drain, which a real device imposes. Treat it
+        as a floor for real-world response latency, not an estimate of it.
+        """
         return 0.0
 
     @property

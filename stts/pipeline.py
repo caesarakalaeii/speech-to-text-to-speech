@@ -7,7 +7,7 @@ callbacks:
 
 The interesting part is that the recogniser runs *while you are still talking*.
 Every `partial_every_ms` it transcribes the audio so far;
-:class:`~voicemask.text.LocalAgreement` works out which words two consecutive
+:class:`~stts.text.LocalAgreement` works out which words two consecutive
 guesses agree on, and only those get synthesised. By the time you stop
 speaking, most of your sentence has already been spoken in the new voice, so
 the delay the listener perceives is far shorter than the sum of the stages.
@@ -74,6 +74,10 @@ class Stats:
     stt_ms: float = 0.0
     tts_ms: float = 0.0
     response_ms: float = 0.0
+    #: Utterances whose closing chunk landed while earlier audio was still
+    #: playing, so the audience heard no pause. Continuity, not latency --
+    #: those chunks still have a real `response_ms`.
+    gapless: int = 0
     dropped_frames: int = 0
     _stt: deque[float] = field(default_factory=lambda: deque(maxlen=20))
     _tts: deque[float] = field(default_factory=lambda: deque(maxlen=20))
@@ -159,7 +163,7 @@ class Pipeline:
             ("asr", self._asr_loop),
             ("tts", self._tts_loop),
         ):
-            thread = threading.Thread(target=target, name=f"voicemask-{name}", daemon=True)
+            thread = threading.Thread(target=target, name=f"stts-{name}", daemon=True)
             thread.start()
             self._threads.append(thread)
         self._emit(Status("Listening"))
@@ -304,20 +308,26 @@ class Pipeline:
             except queue.Empty:
                 continue
             try:
-                # Audio already flowing for this utterance means the listener
-                # is mid-sentence and hears no gap at all.
-                already_audible = self._player.queued_s > 0.02
                 speech = self._synthesiser.synthesise(
                     chunk.text, voice=self.settings.voice, speed=self.settings.speed
                 )
                 self.stats.record_tts(speech.latency_s)
+                # Audio still queued plays before ours does, so it is part of
+                # how long the audience waits for *this* chunk.
+                queued_ahead_s = self._player.queued_s
                 self._player.play(speech.audio, speech.sample_rate)
                 self._emit(Spoke(chunk.text))
 
                 if chunk.ended_at is not None:
+                    # Time from the speaker falling silent to this chunk being
+                    # audible. Queued audio means the listener hears no *gap*
+                    # (counted separately), but this chunk's own words still
+                    # wait for that queue to drain -- so it is not zero.
                     self.stats.record_response(
-                        0.0 if already_audible else time.perf_counter() - chunk.ended_at
+                        time.perf_counter() - chunk.ended_at + queued_ahead_s
                     )
+                    if queued_ahead_s > 0.02:
+                        self.stats.gapless += 1
             except Exception as exc:  # pragma: no cover
                 log.exception("Synthesis failed")
                 self._emit(Failed(f"Synthesis failed: {exc}"))

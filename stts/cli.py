@@ -1,6 +1,6 @@
 """Command line entry point.
 
-`voicemask` with no arguments opens the GUI -- that is what the desktop
+`stts` with no arguments opens the GUI -- that is what the desktop
 shortcut runs. The subcommands exist for setup, diagnostics and the GPU
 benchmark; a normal user never types them.
 """
@@ -71,7 +71,7 @@ def cmd_devices(_args: argparse.Namespace) -> int:
 def cmd_doctor(_args: argparse.Namespace) -> int:
     from .audio import devices
 
-    print(f"VoiceMask data     : {paths.data_dir()}")
+    print(f"App data           : {paths.data_dir()}")
     print(f"Python             : {sys.version.split()[0]}")
     print(f"Runtime            : {runtime.describe()}")
     print(f"GPU (DirectML)     : {'available' if runtime.has_gpu() else 'not installed'}")
@@ -149,7 +149,7 @@ def cmd_run(_args: argparse.Namespace) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        prog="voicemask", description="Real-time local voice masking."
+        prog="stts", description="Real-time local voice masking."
     )
     parser.add_argument("-v", "--verbose", action="store_true")
     sub = parser.add_subparsers(dest="command")
@@ -171,7 +171,7 @@ def main(argv: list[str] | None = None) -> int:
     except KeyboardInterrupt:
         return 130
     except Exception as exc:
-        log.exception("voicemask failed after %.1fs", time.perf_counter() - started)
+        log.exception("stts failed after %.1fs", time.perf_counter() - started)
         print(f"\nError: {exc}\nDetails: {paths.log_path()}", file=sys.stderr)
         return 1
 

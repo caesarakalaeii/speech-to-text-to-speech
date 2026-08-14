@@ -2,10 +2,10 @@
 
 For a streamer, playing the masked voice out of a speaker is useless -- OBS and
 Discord need it as a *microphone*. On Windows that means a virtual audio cable
-driver. VoiceMask does not bundle one: installing a kernel driver is the
-user's decision, needs administrator rights, and the installer belongs to
-VB-Audio. What we do is detect whether one is present, and if not, fetch the
-official installer and hand it over with instructions.
+driver. We do not bundle one: installing a kernel driver is the user's
+decision, needs administrator rights, and the installer belongs to VB-Audio.
+What we do is detect whether one is present, and if not, fetch the official
+installer and hand it over with instructions.
 """
 
 from __future__ import annotations
@@ -25,15 +25,15 @@ VB_CABLE_PAGE = "https://vb-audio.com/Cable/"
 VB_CABLE_ZIP = "https://download.vb-audio.com/Download_CABLE/VBCABLE_Driver_Pack43.zip"
 
 _EXPLAINER = (
-    "VoiceMask needs a “virtual microphone” so OBS, Discord and your browser "
+    "This app needs a “virtual microphone” so OBS, Discord and your browser "
     "can hear the new voice instead of your real one.\n\n"
     "The standard free tool for this is VB-CABLE, made by VB-Audio.\n\n"
-    "If you continue, VoiceMask will download it from vb-audio.com and open "
-    "their installer. You will need to:\n"
+    "If you continue, it will be downloaded from vb-audio.com and their "
+    "installer will open. You will need to:\n"
     "   1. Click “Yes” when Windows asks for permission\n"
     "   2. Click “Install Driver”\n"
     "   3. Restart your PC\n\n"
-    "VoiceMask cannot do those steps for you — Windows requires you to approve "
+    "Those steps cannot be done for you — Windows requires you to approve "
     "driver installation yourself.\n\n"
     "Download and open the VB-CABLE installer now?"
 )
@@ -49,7 +49,7 @@ def guide_virtual_cable_install(parent=None) -> bool:
 
     if not is_windows():
         messagebox.showinfo(
-            "VoiceMask",
+            "Speech-to-Text-to-Speech",
             "Virtual audio cables are handled differently outside Windows.\n\n"
             "On Linux use a PipeWire or PulseAudio null sink; on macOS use "
             "BlackHole. Then pick it as the output device.",
@@ -65,7 +65,7 @@ def guide_virtual_cable_install(parent=None) -> bool:
     except Exception as exc:
         log.exception("VB-CABLE download failed")
         messagebox.showerror(
-            "VoiceMask",
+            "Speech-to-Text-to-Speech",
             f"Could not download VB-CABLE ({exc}).\n\n"
             f"You can install it manually from {VB_CABLE_PAGE}",
             parent=parent,
@@ -83,7 +83,7 @@ def guide_virtual_cable_install(parent=None) -> bool:
     except Exception as exc:
         log.exception("Could not launch VB-CABLE installer")
         messagebox.showerror(
-            "VoiceMask",
+            "Speech-to-Text-to-Speech",
             f"Downloaded the installer but could not open it ({exc}).\n\n"
             f"Run it yourself:\n{installer}",
             parent=parent,
@@ -93,8 +93,8 @@ def guide_virtual_cable_install(parent=None) -> bool:
     messagebox.showinfo(
         "Almost done",
         "Finish the VB-CABLE installer, then restart your PC.\n\n"
-        "After the restart, open VoiceMask and choose “CABLE Input” as where "
-        "the voice goes. In OBS or Discord, choose “CABLE Output” as your "
+        "After the restart, open this app and choose “CABLE Input” as where the "
+        "voice goes. In OBS or Discord, choose “CABLE Output” as your "
         "microphone.",
         parent=parent,
     )
@@ -103,7 +103,7 @@ def guide_virtual_cable_install(parent=None) -> bool:
 
 def download_virtual_cable(destination: Path | None = None) -> Path:
     """Download and extract the VB-CABLE driver pack; return the setup .exe."""
-    destination = destination or Path(tempfile.gettempdir()) / "voicemask-vbcable"
+    destination = destination or Path(tempfile.gettempdir()) / "stts-vbcable"
     destination.mkdir(parents=True, exist_ok=True)
 
     archive = destination / "VBCABLE_Driver_Pack.zip"

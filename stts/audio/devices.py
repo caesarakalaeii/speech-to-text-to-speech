@@ -8,7 +8,7 @@ from dataclasses import dataclass
 
 log = logging.getLogger(__name__)
 
-# Names used by the common Windows virtual audio drivers. Routing VoiceMask's
+# Names used by the common Windows virtual audio drivers. Routing Speech-to-Text-to-Speech's
 # output into one of these is what makes the masked voice show up as a
 # microphone in OBS, Discord or a browser.
 _VIRTUAL_CABLE_PATTERNS = [

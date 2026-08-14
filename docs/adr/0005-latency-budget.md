@@ -39,41 +39,74 @@ Four costs make up the delay, measured from the moment the user stops talking:
 | Stage                        | Cost      | Notes |
 |------------------------------|-----------|-------|
 | Endpoint detection           | 320 ms    | configurable, 200-800 ms |
-| Recognition                  | ~190 ms   | Parakeet, i7-11700K |
-| Synthesis                    | ~425 ms   | Kokoro fp16, one sentence |
-| Output buffering             | ~20 ms    | PortAudio |
+| Recognition                  | ~190 ms   | Parakeet, i7-11700K, ADR 3 |
+| Synthesis                    | ~425 ms   | Kokoro fp16, one sentence, ADR 4 |
+| Output buffering             | ~20 ms    | PortAudio, estimated not measured |
 | **Naive total**              | **~950 ms** | just inside the budget |
 
-Three decisions pull the real figure far below that.
+That total is the worst case: a short phrase said in isolation, where nothing
+can be overlapped. Three decisions pull the typical figure below it, and remove
+the audible gap entirely for continuous speech.
 
 **1. Speculative transcription while the user is still speaking.** Every
 400 ms the recogniser runs on the audio so far. Each pass costs ~190 ms and
 happens during speech, so it is free in wall-clock terms.
 
 **2. Commit only what two consecutive passes agree on** (LocalAgreement-2,
-`voicemask.text.LocalAgreement`). A growing transcript is volatile at the tail
+`stts.text.LocalAgreement`). A growing transcript is volatile at the tail
 -- the recogniser revises the last word or two once it hears more context, so
 "welcome to the stripe" becomes "welcome to the stream". Speaking the tail
 immediately would speak words the user never said. Speaking only the agreed
 prefix is safe, and that prefix is available long before the sentence ends.
 
 **3. Synthesise in sentence-sized chunks** so playback of one chunk overlaps
-generation of the next (`voicemask.text.SpeechBuffer`). A speaker who never
+generation of the next (`stts.text.SpeechBuffer`). A speaker who never
 pauses still gets audio, because the buffer releases at a clause boundary once
 it passes 140 characters.
 
 Together these mean that for continuous speech, audio is *already playing* when
-the speaker stops. The end-to-end test measures this: **0 ms** response for a
-typical sentence, because the pipeline was mid-utterance when speech ended.
+the speaker stops, so the audience is never left in silence.
+
+**That is continuity, not zero latency, and the two must not be conflated.**
+An earlier revision of this ADR and of the README claimed a measured "0 ms"
+response for continuous speech. That number was not a measurement. The pipeline
+literally recorded the constant `0.0` whenever the output queue was non-empty:
+
+```python
+already_audible = self._player.queued_s > 0.02
+...
+self.stats.record_response(
+    0.0 if already_audible else time.perf_counter() - chunk.ended_at
+)
+```
+
+Two things were wrong with it. It reported zero for the case that has the
+*most* latency, since a chunk queued behind 800 ms of unplayed audio waits that
+800 ms before anyone hears it. And no test ever exercised the branch: the e2e
+suite's `FakePlayer.queued_s` is hardcoded to `0.0`, so `already_audible` was
+always false there and the constant was never reached under test.
+
+`Pipeline._tts_loop` now records `elapsed + queued_ahead_s` — the real time
+from the speaker falling silent to that chunk becoming audible — and counts the
+gapless case separately in `Stats.gapless`. The GUI status line therefore shows
+a true delay figure rather than a flattering zero.
 
 Streaming can be turned off (`streaming: false`), which costs about half a
 second of delay and some CPU.
 
 ## Consequences
 
-- The honest claim is: **typically under half a second, and effectively zero
-  for continuous speech; worst case under one second for a short isolated
-  phrase.** Not 50 ms, and the README says so rather than implying otherwise.
+- The honest claim is: **worst case under one second for a short isolated
+  phrase, and no audible gap during continuous speech** -- with the tail of a
+  long unbroken sentence lagging further behind, bounded by the output queue.
+  Not 50 ms, and not zero, and the README says so rather than implying
+  otherwise.
+- What is actually asserted in CI is the sub-second bound
+  (`test_response_latency_is_under_one_second`). Because the fake player
+  swallows audio instantly, that assertion covers recognise + synthesise but
+  excludes playback-queue wait, so treat it as a floor on real-world response
+  latency rather than an estimate of it. Measuring the real figure needs a real
+  device; `Stats.response_ms` in the running app is the number to trust.
 - `endpoint_ms` is the dial that matters and it is exposed in the GUI. Below
   ~250 ms it starts cutting people off mid-sentence.
 - Speculative passes cost CPU proportional to utterance length: a 10-second

@@ -35,11 +35,11 @@ Requirements for v2:
 2. `uv sync --no-dev` reads `pyproject.toml`, **downloads a private CPython
    3.12** if the machine has none, creates `.venv`, and installs the
    dependencies. The user never sees Python.
-3. `uv run python -m voicemask.install` downloads the models with a progress
+3. `uv run python -m stts.install` downloads the models with a progress
    bar and creates a desktop shortcut pointing at `pythonw.exe`, so the app
    opens with no console window.
 
-Configuration lives in `%LOCALAPPDATA%\VoiceMask\settings.json`, written by the
+Configuration lives in `%LOCALAPPDATA%\stts\settings.json`, written by the
 GUI. There is no `.env` to edit.
 
 The batch files stay thin -- the longest is 36 lines -- because batch is a poor
@@ -59,7 +59,7 @@ folder starts ~90 characters in. It was hit during development, and diagnosed
 only by bisecting path lengths.
 
 `paths.safe_espeak_data_path` measures the path and, if it is over 120
-characters, copies the data once somewhere short. `voicemask doctor` reports
+characters, copies the data once somewhere short. `stts doctor` reports
 which path is in use.
 
 ## Consequences
@@ -70,5 +70,5 @@ which path is in use.
 - `uv.lock` is committed, so every install resolves to identical versions.
 - We depend on `astral.sh` being reachable at install time. The alternative --
   vendoring `uv` -- would mean committing a 30 MB binary and hand-updating it.
-- `Report-Problem.bat` writes `voicemask doctor` output plus the log to the
+- `Report-Problem.bat` writes `stts doctor` output plus the log to the
   desktop, so a support request is one file rather than a conversation.

@@ -62,7 +62,7 @@ Piper is kept as a fast, lower-quality fallback.
   than alphabetically, so the good ones are at the top.
 - Output is 24 kHz mono, resampled to whatever the output device wants.
 - `kokoro-onnx` phonemises through espeak-ng, which brings the path-length
-  problem documented in `voicemask/paths.py` and ADR 6.
+  problem documented in `stts/paths.py` and ADR 6.
 - RTF ~0.18 means synthesis is the dominant cost in the pipeline. Splitting
   text into sentence-sized chunks so playback overlaps generation (ADR 5) is
   what keeps that off the critical path.

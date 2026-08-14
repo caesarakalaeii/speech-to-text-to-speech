@@ -62,7 +62,7 @@ def session_options(threads: int | None = None) -> ort.SessionOptions:
 
 def default_threads() -> int:
     """0 means 'let ONNX Runtime decide', which is right on most machines."""
-    override = os.environ.get("VOICEMASK_THREADS")
+    override = os.environ.get("STTS_THREADS")
     if override and override.isdigit():
         return int(override)
     return 0

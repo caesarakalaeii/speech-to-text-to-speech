@@ -37,7 +37,7 @@ class App:
         self._synth_for_preview: tts.VoiceRouter | None = None
 
         self.root = tk.Tk()
-        self.root.title("VoiceMask")
+        self.root.title("Speech-to-Text-to-Speech")
         self.root.minsize(640, 620)
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
         self._build()
@@ -392,7 +392,7 @@ class App:
             elif kind == "__error__":
                 self.status.configure(text="Something went wrong")
                 messagebox.showerror(
-                    "VoiceMask",
+                    "Speech-to-Text-to-Speech",
                     f"{event[1]}\n\nDetails were written to:\n{log_path()}",
                 )
             elif kind == "__done__":
